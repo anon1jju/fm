@@ -4,8 +4,8 @@
  * 
  * File ini menangani permintaan untuk menyimpan transaksi penjualan obat
  * 
- * @version 1.0.0
- * @date 2025-04-17
+ * @version 1.1.0
+ * @date 2025-04-20
  */
 
 // Include file fungsi
@@ -22,59 +22,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         handleError("Koneksi database gagal", 500);
     }
     
-    // Terima data JSON dari request
-    $input = file_get_contents('php://input');
-    $requestData = json_decode($input, true);
+    // Mulai transaksi database
+    $pdo->beginTransaction();
     
-    // Log the received data for debugging
-    error_log("Received data: " . $input);
-    
-    // Validasi data
-    if (!isset($requestData['items']) || empty($requestData['items'])) {
-        handleError("Tidak ada item obat yang dipilih", 400);
-    }
-    
-    // Default values jika diperlukan
-    if (!isset($requestData['customer_name'])) {
-        $requestData['customer_name'] = NULL;
-    }
-    
-    if (!isset($requestData['doctor_id'])) {
-        $requestData['doctor_id'] = NULL;
-    }
-    
-    if (!isset($requestData['prescription_number'])) {
-        $requestData['prescription_number'] = NULL;
-    }
-    
-    if (!isset($requestData['discount_amount'])) {
-        $requestData['discount_amount'] = 0;
-    }
-    
-    if (!isset($requestData['notes'])) {
-        $requestData['notes'] = NULL;
-    }
-    
-    // Set payment_status ke 'paid' secara default
-    $requestData['payment_status'] = 'paid';
-    
-    // Validasi obat resep
-    $hasPrescriptionMedicines = false;
-    
-    foreach ($requestData['items'] as $item) {
-        $product = getProductById($pdo, $item['product_id']);
+    try {
+        // Terima data JSON dari request
+        $input = file_get_contents('php://input');
+        $requestData = json_decode($input, true);
         
-        if ($product && $product['requires_prescription'] && 
-            (!isset($requestData['doctor_id']) || !isset($requestData['prescription_number']))) {
-            handleError("Obat resep memerlukan data dokter dan nomor resep", 400);
+        // Validasi data
+        if (!isset($requestData['items']) || empty($requestData['items'])) {
+            throw new Exception("Tidak ada item obat yang dipilih", 400);
         }
+        
+        // Validasi dan update stok
+        foreach ($requestData['items'] as $item) {
+            $stmt = $pdo->prepare("SELECT stock_quantity FROM products WHERE product_id = :product_id FOR UPDATE");
+            $stmt->execute([':product_id' => $item['product_id']]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$product) {
+                throw new Exception("Produk dengan ID {$item['product_id']} tidak ditemukan", 404);
+            }
+            
+            if ($product['stock_quantity'] < $item['quantity']) {
+                throw new Exception("Stok produk {$item['product_id']} tidak mencukupi", 400);
+            }
+            
+            // Update stok
+            $stmt = $pdo->prepare("UPDATE products SET stock_quantity = stock_quantity - :quantity WHERE product_id = :product_id");
+            $stmt->execute([
+                ':quantity' => $item['quantity'],
+                ':product_id' => $item['product_id']
+            ]);
+        }
+        
+        // Simpan transaksi (implementasi fungsi savePharmacyTransaction harus mendukung transaksi)
+        $result = savePharmacyTransaction($pdo, $requestData);
+        
+        // Commit transaksi
+        $pdo->commit();
+        
+        // Kembalikan response
+        echo json_encode($result);
+    } catch (Exception $e) {
+        // Rollback transaksi jika terjadi kesalahan
+        $pdo->rollBack();
+        handleError($e->getMessage(), $e->getCode() ?: 500);
     }
-    
-    // Simpan transaksi
-    $result = savePharmacyTransaction($pdo, $requestData);
-    
-    // Kembalikan response
-    echo json_encode($result);
 } elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // Respond with a simple test message for GET requests
     header('Content-Type: application/json');
