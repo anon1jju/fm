@@ -159,8 +159,7 @@ function searchProductsForCashier($pdo, $keyword) {
                   FROM products p
                   LEFT JOIN product_categories c ON p.category_id = c.category_id
                   LEFT JOIN medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
-                  WHERE p.is_active = 1 AND p.stock_quantity > 0 AND
-                        p.barcode = :barcode
+                  WHERE p.is_active = 1 AND p.barcode = :barcode
                   LIMIT 1";
         
         $stmtBarcode = $pdo->prepare($barcodeQuery);
@@ -180,7 +179,7 @@ function searchProductsForCashier($pdo, $keyword) {
                   FROM products p
                   LEFT JOIN product_categories c ON p.category_id = c.category_id
                   LEFT JOIN medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
-                  WHERE p.is_active = 1 AND p.stock_quantity > 0 AND
+                  WHERE p.is_active = 1 AND
                         (p.product_name LIKE :keyword OR 
                          p.kode_item LIKE :keyword)
                   ORDER BY p.product_name
@@ -213,7 +212,7 @@ function getProductsByCategoryForCashier($pdo, $categoryId, $limit = 50) {
                   FROM products p
                   LEFT JOIN product_categories c ON p.category_id = c.category_id
                   LEFT JOIN medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
-                  WHERE p.is_active = 1 AND p.stock_quantity > 0 AND p.category_id = :category_id
+                  WHERE p.is_active = 1 AND p.category_id = :category_id
                   ORDER BY p.product_name
                   LIMIT :limit";
         
@@ -246,7 +245,7 @@ function getPopularProductsForCashier($pdo, $limit = 12) {
                   LEFT JOIN medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
                   LEFT JOIN sale_items si ON p.product_id = si.product_id
                   LEFT JOIN sales s ON si.sale_id = s.sale_id AND s.sale_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                  WHERE p.is_active = 1 AND p.stock_quantity > 0
+                  WHERE p.is_active = 1
                   GROUP BY p.product_id
                   ORDER BY sales_count DESC, p.product_name
                   LIMIT :limit";
