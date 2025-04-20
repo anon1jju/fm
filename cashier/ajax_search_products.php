@@ -10,9 +10,6 @@
 // Include file fungsi cashier
 require_once '../functions.php';
 
-// Dapatkan koneksi database
-$pdo = connectDatabase();
-
 // Set header JSON
 header('Content-Type: application/json');
 
@@ -39,7 +36,7 @@ if (isset($_GET['keyword'])) {
                         p.barcode = :barcode
                   LIMIT 1";
             
-            $stmt = $pdo->prepare($query);
+            $stmt = $farma->getPDO()->prepare($query);
             $stmt->bindParam(':barcode', $keyword);
             $stmt->execute();
             
@@ -57,7 +54,7 @@ if (isset($_GET['keyword'])) {
     
     // Jika tidak ditemukan produk dengan barcode atau bukan pencarian barcode,
     // gunakan fungsi pencarian normal
-    $products = searchProductsForCashier($pdo, $keyword);
+    $products = $farma->searchProductsForCashier($keyword);
     echo json_encode($products);
 } else {
     echo json_encode([
