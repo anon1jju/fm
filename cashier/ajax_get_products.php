@@ -7,7 +7,7 @@
  */
 
 // Include file fungsi cashier
-require_once 'cashier_functions.php';
+require_once '../functions.php';
 
 // Dapatkan koneksi database
 $pdo = connectDatabase();
