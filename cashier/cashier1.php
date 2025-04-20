@@ -9,7 +9,7 @@
  */
 
 // Include file fungsi cashier
-require_once 'cashier_functions.php';
+require_once '../functions.php';
 
 // Cek session untuk autentikasi (implementasi sesuai sistem login Anda)
 // session_start();
