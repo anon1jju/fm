@@ -9,8 +9,6 @@
 // Include file fungsi cashier
 require_once '../functions.php';
 
-// Dapatkan koneksi database
-$pdo = connectDatabase();
 
 // Set header JSON
 header('Content-Type: application/json');
@@ -21,10 +19,10 @@ if (isset($_GET['category_id'])) {
     
     if ($categoryId === 0) {
         // Tampilkan produk populer jika kategori "Semua"
-        $products = getPopularProductsForCashier($pdo, 50);
+        $products = $farma->getPopularProductsForCashier(50);
     } else {
         // Tampilkan produk berdasarkan kategori
-        $products = getProductsByCategoryForCashier($pdo, $categoryId);
+        $products = $farma->getProductsByCategoryForCashier($categoryId);
     }
     
     echo json_encode($products);
