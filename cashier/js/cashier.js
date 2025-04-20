@@ -114,7 +114,13 @@ function renderCartItems() {
             renderCartItems();
             updateCartSummary();
         } else {
-            alert('Stok tidak mencukupi');
+            Swal.fire({
+                icon: 'error', // Ikon error (bisa 'success', 'warning', 'info', atau 'error')
+                title: 'Stok Habis',
+                text: `Stok tidak mencukupi`,
+                showConfirmButton: false,
+                timer: 1300
+            });
         }
     });
     
@@ -129,22 +135,40 @@ function renderCartItems() {
 // Add product to cart directly
 function addProductToCart(productData, quantity = 1) {
     const { product_id, product_name, kode_item, price, stock_quantity, unit, requires_prescription } = productData;
-    
+
     // Parse price to ensure it's a number
     const productPrice = parseFloat(price);
-    
+
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(item => item.id === product_id);
-    
+
+    // Validasi stok sebelum menambahkan ke keranjang
+    if (stock_quantity <= 0) {
+        Swal.fire({
+            icon: 'error', // Ikon error (bisa 'success', 'warning', 'info', atau 'error')
+            title: 'Stok Habis',
+            text: `Stok produk "${product_name}" sudah habis.`,
+            showConfirmButton: false,
+            timer: 1500
+        });
+        return;
+    }
+
     if (existingItemIndex !== -1) {
         // Update quantity if product is already in cart
         const newQuantity = cartItems[existingItemIndex].quantity + quantity;
-        
+
         if (newQuantity > stock_quantity) {
-            alert('Stok tidak mencukupi');
+                Swal.fire({
+                icon: 'error', // Ikon error (bisa 'success', 'warning', 'info', atau 'error')
+                title: 'Stok Habis',
+                text: `Stok tidak mencukupi`,
+                showConfirmButton: false,
+                timer: 1500
+            });
             return;
         }
-        
+
         cartItems[existingItemIndex].quantity = newQuantity;
         cartItems[existingItemIndex].total = productPrice * newQuantity;
     } else {
@@ -161,11 +185,11 @@ function addProductToCart(productData, quantity = 1) {
             requires_prescription: requires_prescription == 1 ? 1 : 0
         });
     }
-    
+
     // Update cart display
     renderCartItems();
     updateCartSummary();
-    
+
     // Show a brief notification
     showAddedToCartNotification(product_name);
 }
@@ -299,9 +323,9 @@ function renderProducts(products) {
                     <div class="flex justify-between items-center mt-1">
                         <p class="text-blue-600 font-bold">Rp ${parseInt(product.price).toLocaleString('id-ID')}</p>
                         ${
-                            product.stock_quantity === 0
-                                ? `<span class="bg-red-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`
-                                : product.stock_quantity < product.minimum_stock * 2
+                            parseInt(product.stock_quantity) === 0
+                                ? `<span class="bg-red-200 text-gray-900 px-2 py-1 rounded text-sm">Stok Habis</span>`
+                                : parseInt(product.stock_quantity) < product.minimum_stock * 2
                                 ? `<span class="bg-yellow-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`
                                 : `<span class="bg-green-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`
                         }
@@ -329,7 +353,12 @@ function saveTransaction() {
         const prescriptionNumber = $('#prescription-number').val();
         
         if (!doctorId || !prescriptionNumber) {
-            alert('Informasi resep dokter diperlukan untuk obat resep');
+            Swal.fire({
+                icon: 'warning', // Ikon peringatan
+                title: 'Informasi Resep Diperlukan',
+                text: 'Informasi resep dokter diperlukan untuk obat resep. Mohon lengkapi data resep sebelum melanjutkan.',
+                confirmButtonText: 'OK'
+            });
             return false;
         }
     }
@@ -402,12 +431,22 @@ function saveTransaction() {
                 // Hide cash payment fields
                 $('#cash-payment-fields').addClass('hidden');
             } else {
-                alert('Error: ' + response.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message || 'Terjadi kesalahan saat menyimpan transaksi.',
+                    confirmButtonText: 'OK'
+                });
             }
         },
         error: function(xhr, status, error) {
             console.error('Error saving transaction:', error);
-            alert('Terjadi kesalahan saat menyimpan transaksi. Silakan coba lagi.');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Terjadi kesalahan saat menyimpan transaksi. Silakan coba lagi.',
+                confirmButtonText: 'OK'
+            });
         }
     });
     
@@ -702,12 +741,22 @@ $(document).ready(function() {
     // Process payment button
     $('#process-payment-btn').click(function() {
         if (cartItems.length === 0) {
-            alert('Keranjang kosong');
+            Swal.fire({
+                icon: 'error', // Ikon error (bisa 'success', 'warning', 'info', atau 'error')
+                title: 'Keranjang kosong',
+                showConfirmButton: false,
+                timer: 1500
+            });
             return;
         }
         
         if (selectedPaymentMethod === null) {
-            alert('Pilih metode pembayaran');
+            Swal.fire({
+                icon: 'info', // Ikon error (bisa 'success', 'warning', 'info', atau 'error')
+                title: 'Resep Dokter',
+                showConfirmButton: false,
+                timer: 1500
+            });
             return;
         }
         
@@ -718,7 +767,13 @@ $(document).ready(function() {
             const prescriptionNumber = $('#prescription-number').val();
             
             if (!doctorId || !prescriptionNumber) {
-                alert('Informasi resep dokter diperlukan untuk obat resep');
+                Swal.fire({
+                    icon: 'warning', // Ikon error (bisa 'success', 'warning', 'info', atau 'error')
+                    title: 'Resep Dokter',
+                    text: `Informasi resep dokter diperlukan untuk obat resep`,
+                    showConfirmButton: false,
+                    timer: 1500
+                });
                 return;
             }
         }
@@ -754,6 +809,7 @@ $(document).ready(function() {
     $('#success-new').click(function() {
         $('#success-modal').addClass('hidden');
         // No need to reset anything - already done after saving transaction
+        location.reload();
     });
     
     // Close modals when clicking outside
