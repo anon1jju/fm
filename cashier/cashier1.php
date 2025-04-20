@@ -18,20 +18,20 @@ require_once '../functions.php';
 //     exit;
 // }
 
-// Dapatkan koneksi database
-$pdo = connectDatabase();
+//$pdo = $farma->getPDO(); // Mendapatkan koneksi database
+$products = $farma->getAllProducts(); // Mengambil semua produk
 
 // Dapatkan kategori produk
-$categories = getAllCategories($pdo);
+$categories = $farma->getAllCategories();
 
 // Dapatkan metode pembayaran
-$paymentMethods = getActivePaymentMethods($pdo);
+$paymentMethods = $farma->getActivePaymentMethods();
 
 // Dapatkan dokter (untuk resep)
-$doctors = getDoctorsForDropdown($pdo);
+$doctors = $farma->getDoctorsForDropdown();
 
 // Default tampilkan produk populer
-$popularProducts = getPopularProductsForCashier($pdo);
+$popularProducts = $farma->getPopularProductsForCashier(12);
 
 // Penanganan pencarian produk via AJAX akan dilakukan di file terpisah
 ?>
@@ -45,6 +45,9 @@ $popularProducts = getPopularProductsForCashier($pdo);
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- SweetAlert2 -->
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="bg-gray-100 font-sans">
     <div class="min-h-screen flex flex-col">
@@ -262,7 +265,6 @@ $popularProducts = getPopularProductsForCashier($pdo);
             </div>
         </div>
     </div>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="js/cashier.js"></script>
 </body>
 </html>
