@@ -1072,6 +1072,6 @@ class Farmamedika
     }
 }
 
-$farma = new Farmamedika($pdo);
+$farma = new Farmamedika();
 
 ?>
