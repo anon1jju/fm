@@ -9,9 +9,6 @@
 // Include file fungsi cashier
 require_once '../functions.php';
 
-// Dapatkan koneksi database
-$pdo = connectDatabase();
-
 // Cek parameter id
 if (!isset($_GET['id'])) {
     echo 'Parameter ID transaksi diperlukan';
@@ -21,7 +18,7 @@ if (!isset($_GET['id'])) {
 $saleId = intval($_GET['id']);
 
 // Dapatkan data struk
-$receiptData = getReceiptData($pdo, $saleId);
+$receiptData = $farma->getReceiptData($saleId);
 
 if (!$receiptData) {
     echo 'Transaksi tidak ditemukan';
@@ -29,7 +26,7 @@ if (!$receiptData) {
 }
 
 // Generate HTML struk
-$receiptHTML = generateReceiptHTML($receiptData);
+$receiptHTML = $farma->generateReceiptHTML($receiptData);
 
 // Tampilkan HTML
 echo $receiptHTML;
