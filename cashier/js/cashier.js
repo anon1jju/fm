@@ -366,9 +366,6 @@ function saveTransaction() {
         }))
     };
     
-    // Show loading indicator
-    $('#loading-indicator').removeClass('hidden');
-    
     // Send transaction data to server
     $.ajax({
         url: 'save_transaction.php',
@@ -376,8 +373,6 @@ function saveTransaction() {
         contentType: 'application/json',
         data: JSON.stringify(transactionData),
         success: function(response) {
-            // Hide loading indicator
-            $('#loading-indicator').addClass('hidden');
             if (response.success) {
                 lastTransactionId = response.sale_id;
                 lastInvoiceNumber = response.invoice_number;
@@ -407,26 +402,12 @@ function saveTransaction() {
                 // Hide cash payment fields
                 $('#cash-payment-fields').addClass('hidden');
             } else {
-                // Show error notification
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Transaksi Gagal',
-                    text: response.message,
-                    confirmButtonText: 'OK'
-                });
+                alert('Error: ' + response.message);
             }
         },
         error: function(xhr, status, error) {
-            // Hide loading indicator
-            $('#loading-indicator').addClass('hidden');
-
             console.error('Error saving transaction:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Kesalahan Sistem',
-                text: 'Terjadi kesalahan saat menyimpan transaksi. Silakan coba lagi.',
-                confirmButtonText: 'OK'
-            });
+            alert('Terjadi kesalahan saat menyimpan transaksi. Silakan coba lagi.');
         }
     });
     
