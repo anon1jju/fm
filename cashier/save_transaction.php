@@ -14,13 +14,7 @@ require_once '../functions.php';
 // API endpoint untuk menyimpan transaksi
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
-    
-    // Dapatkan koneksi database
-    $pdo = connectDatabase();
-    
-    if (!$pdo) {
-        handleError("Koneksi database gagal", 500);
-    }
+
     
     // Terima data JSON dari request
     $input = file_get_contents('php://input');
@@ -31,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Validasi data
     if (!isset($requestData['items']) || empty($requestData['items'])) {
-        handleError("Tidak ada item obat yang dipilih", 400);
+        $farma->handleError("Tidak ada item obat yang dipilih", 400);
     }
     
     // Default values jika diperlukan
@@ -62,16 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hasPrescriptionMedicines = false;
     
     foreach ($requestData['items'] as $item) {
-        $product = getProductById($pdo, $item['product_id']);
+        $product = $farma->getProductById($item['product_id']);
         
         if ($product && $product['requires_prescription'] && 
             (!isset($requestData['doctor_id']) || !isset($requestData['prescription_number']))) {
-            handleError("Obat resep memerlukan data dokter dan nomor resep", 400);
+            $farma->handleError("Obat resep memerlukan data dokter dan nomor resep", 400);
         }
     }
     
     // Simpan transaksi
-    $result = savePharmacyTransaction($pdo, $requestData);
+    $result = $farma->savePharmacyTransaction($requestData);
     
     // Kembalikan response
     echo json_encode($result);
