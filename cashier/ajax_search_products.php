@@ -35,7 +35,7 @@ if (isset($_GET['keyword'])) {
             $query = "SELECT p.product_id, p.product_name, p.kode_item,
                          p.price, p.posisi, p.stock_quantity, p.unit, p.requires_prescription
                   FROM products p
-                  WHERE p.is_active = 1 AND p.stock_quantity > 0 AND
+                  WHERE p.is_active = 1 AND
                         p.barcode = :barcode
                   LIMIT 1";
             
