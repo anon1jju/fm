@@ -2,6 +2,11 @@
 require_once 'functions.php'; // Pastikan session_start() sudah ada di sini
 $error = isset($_SESSION['error']) ? $_SESSION['error'] : '';
 unset($_SESSION['error']); // Hapus error setelah ditampilkan
+
+if (!$farma->checkPersistentSession()) {
+    header("Location: signin.php");
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
