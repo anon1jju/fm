@@ -78,9 +78,9 @@ class Farmamedika
      * Fungsi untuk membuat nomor invoice
      * @return string Format invoice APT-YYYYMMDD-XXXX
      */
-    public function generateInvoiceNumber($user)
+    public function generateInvoiceNumber()
     {
-        return 'APT-'.$user. date('Ymd') . '-' . rand(1000, 9999);
+        return 'APT-' . date('Ymd') . '-' . rand(1000, 9999);
     }
 
     /**
@@ -247,31 +247,19 @@ class Farmamedika
     {
         try {
             $this->pdo->beginTransaction();
-
+    
             // Generate invoice number
-            $invoiceNumber = $this->generateInvoiceNumber(); // <- asumsi ini method dalam class juga
-
+            $invoiceNumber = $this->generateInvoiceNumber();
+    
             // Insert sale header
             $stmtHeader = $this->pdo->prepare("
                 INSERT INTO sales (
-                    invoice_number, 
-                    customer_name, 
-                    doctor_id, 
-                    prescription_number, 
-                    user_id, 
-                    subtotal, 
-                    tax_amount, 
-                    discount_amount, 
-                    total_amount, 
-                    payment_method_id, 
-                    payment_status, 
-                    notes,
-                    sale_date
-                ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()
-                )
+                    invoice_number, customer_name, doctor_id, prescription_number, user_id, 
+                    subtotal, tax_amount, discount_amount, total_amount, payment_method_id, 
+                    payment_status, notes, sale_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
-
+    
             $stmtHeader->execute([
                 $invoiceNumber,
                 $data['customer_name'],
@@ -286,45 +274,41 @@ class Farmamedika
                 $data['payment_status'],
                 $data['notes'],
             ]);
-
+    
             $saleId = $this->pdo->lastInsertId();
-
+    
             foreach ($data['items'] as $item) {
                 $stmtProduct = $this->pdo->prepare("
                     SELECT product_id, stock_quantity, price 
                     FROM products 
-                    WHERE product_id = ?
+                    WHERE product_id = ? 
+                    FOR UPDATE
                 ");
                 $stmtProduct->execute([$item['product_id']]);
                 $product = $stmtProduct->fetch(PDO::FETCH_ASSOC);
-
+    
                 if (!$product) {
                     throw new Exception("Produk dengan ID {$item['product_id']} tidak ditemukan");
                 }
-
+    
                 if ($product['stock_quantity'] < $item['quantity']) {
                     throw new Exception("Stok tidak mencukupi untuk produk ID: {$item['product_id']}");
                 }
-
-                $batch_id = null; // default jika tidak pakai batch tracking
-
+    
+                $batch_id = null;
+    
                 $discountPercent = $item['discount_percent'] ?? 0;
                 $itemTotal = $item['quantity'] * $item['unit_price'] * (1 - $discountPercent / 100);
-
+    
                 $stmtItem = $this->pdo->prepare("
                     INSERT INTO sale_items (
-                        sale_id, 
-                        product_id, 
-                        batch_id, 
-                        quantity, 
-                        unit_price, 
-                        discount_percent, 
-                        item_total
+                        sale_id, product_id, batch_id, quantity, unit_price, 
+                        discount_percent, item_total
                     ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ");
-
+    
                 $stmtItem->execute([$saleId, $item['product_id'], $batch_id, $item['quantity'], $item['unit_price'], $discountPercent, $itemTotal]);
-
+    
                 $stmtUpdateStock = $this->pdo->prepare("
                     UPDATE products 
                     SET stock_quantity = stock_quantity - ? 
@@ -332,9 +316,9 @@ class Farmamedika
                 ");
                 $stmtUpdateStock->execute([$item['quantity'], $item['product_id']]);
             }
-
+    
             $this->pdo->commit();
-
+    
             return [
                 'success' => true,
                 'sale_id' => $saleId,
@@ -346,10 +330,10 @@ class Farmamedika
                 $this->pdo->rollBack();
             }
             error_log("Transaction Error: " . $e->getMessage());
-
+    
             return [
                 'success' => false,
-                'message' => 'Error: ' . $e->getMessage(),
+                'message' => $e->getMessage(),
             ];
         }
     }
@@ -843,8 +827,8 @@ class Farmamedika
                 'name' => 'Farma Medika',
                 'address' => 'Jl. Sultan Iskandar Muda, Punge Jurong, Kec. Meuraxa, Kota Banda Aceh, Aceh',
                 'phone' => '021-12345678',
-                'email' => 'info@apoteksehat.com',
-                'footer_note' => 'Terima kasih atas kunjungan Anda. Semoga lekas sembuh.',
+                'email' => 'info@farmamedika.com',
+                'footer_note' => 'Terima kasih atas kunjungan Anda.',
             ];
 
             return [
