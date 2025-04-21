@@ -1,5 +1,5 @@
 <?php
-require_once '../../functions.php'; // Memastikan session_start() sudah berjalan di sini
+require_once '../functions.php'; // Memastikan session_start() sudah berjalan di sini
 
 // Periksa apakah metode request adalah POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
