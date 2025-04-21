@@ -422,36 +422,6 @@ class Farmamedika
             return false;
         }
     }
-
-    function loginUser($username, $password)
-    {
-        try {
-            $query = "SELECT * FROM users WHERE username = :username AND is_active = 1";
-            $stmt = $this->pdo->prepare($query);
-            $stmt->bindParam(':username', $username);
-            $stmt->execute();
-
-            $user = $stmt->fetch();
-
-            if ($user && password_verify($password, $user['password'])) {
-                // Update last login
-                $updateQuery = "UPDATE users SET last_login = NOW() WHERE user_id = :user_id";
-                $updateStmt = $this->pdo->prepare($updateQuery);
-                $updateStmt->bindParam(':user_id', $user['user_id']);
-                $updateStmt->execute();
-
-                // Hapus password dari result untuk keamanan
-                unset($user['password']);
-
-                return $user;
-            }
-
-            return false;
-        } catch (PDOException $e) {
-            error_log("Database Error (loginUser): " . $e->getMessage());
-            return false;
-        }
-    }
     
     function loginUser($username, $password)
     {
@@ -472,11 +442,6 @@ class Farmamedika
     
                 // Hapus password dari result untuk keamanan
                 unset($user['password']);
-    
-                // Mulai session jika belum dimulai
-                if (session_status() === PHP_SESSION_NONE) {
-                    session_start();
-                }
     
                 // Simpan informasi pengguna ke session
                 $_SESSION['user_id'] = $user['user_id'];
