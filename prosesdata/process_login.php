@@ -18,21 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = $farma->loginUser($username, $password);
 
     if ($user) {
-        // Login berhasil, simpan data user ke dalam session
-        $_SESSION['user_id'] = $user['user_id'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['role'] = $user['role'];
-
+        // Login berhasil, data session sudah disimpan di loginUser
         // Redirect berdasarkan role pengguna
-        switch ($user['role']) {
+        switch ($_SESSION['role']) { // Menggunakan data dari session
             case 'admin':
                 header("Location: admin_dashboard.php");
                 break;
-            /*case 'pharmacist':
-                header("Location: pharmacist_dashboard.php");
-                break;*/
             case 'cashier':
-                header("Location: ../cashier/cashier1.php");
+                header("Location: ../cashier/cashier.php");
                 break;
             default:
                 header("Location: ../signin.php");
