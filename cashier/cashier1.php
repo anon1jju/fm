@@ -56,10 +56,10 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
             <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div class="flex items-center">
                     <i class="fas fa-pills text-2xl mr-2"></i>
-                    <h1 class="text-xl font-semibold">Farma Medika - Kasir</h1>
+                    <h1 class="text-xl font-semibold">Farma Medika - <? echo $_SESSION["username"]?></h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <span class="hidden md:inline-block">Kasir: <span id="cashier-name">Admin</span></span>
+                    <span class="hidden md:inline-block">Kasir: <span id="cashier-name"><? echo $_SESSION["username"]?></span></span>
                     <button class="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded-md">
                         <i class="fas fa-sign-out-alt mr-1"></i>
                         <span class="hidden md:inline-block">Logout</span>
