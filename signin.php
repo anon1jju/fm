@@ -32,14 +32,14 @@ unset($_SESSION['error']); // Hapus error setelah ditampilkan
                                     </div>
                                     <div class="text-center">
                                         <div class="mb-4">
-                                            <h3 class="mb-1">Welcome back!</h3>
-                                            <p>Please enter your credentials to sign in!</p>
+                                            <h3 class="mb-1">Selamat Datang</h3>
+                                            <p>Silahkan login dengan akun anda</p>
                                         </div>
                                         <?php if ($error): ?>
                                             <p style="color: red;"><?= htmlspecialchars($error) ?></p>
                                         <?php endif; ?>
                                         <div>
-                                            <form action="process_login.php" method="POST">
+                                            <form action="prosesdata/process_login.php" method="POST">
                                                 <div class="form-container vertical">
                                                     <div class="form-item vertical">
                                                         <label class="form-label mb-2">User Name</label>
