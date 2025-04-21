@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validasi input kosong
     if (empty($username) || empty($password)) {
         $_SESSION['error'] = "Username dan Password wajib diisi!";
-        header("Location: signin.php");
+        header("Location: ../signin.php");
         exit;
     }
 
@@ -35,17 +35,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: ../cashier/cashier1.php");
                 break;
             default:
-                header("Location: signin.php");
+                header("Location: ../signin.php");
         }
         exit;
     } else {
         // Login gagal, tampilkan error
         $_SESSION['error'] = "Username atau Password salah!";
-        header("Location: signin.php");
+        header("Location: ../signin.php");
         exit;
     }
 } else {
     // Jika metode request bukan POST, redirect ke halaman login
-    header("Location: signin.php");
+    header("Location: ../signin.php");
     exit;
 }
