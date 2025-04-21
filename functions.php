@@ -80,7 +80,7 @@ class Farmamedika
      */
     public function generateInvoiceNumber($user)
     {
-        return 'APT-'.$user.'-'. date('Ymd') . '-' . rand(1000, 9999);
+        return 'FM-'.$user.'-'. date('Ymd') . '-' . rand(1000, 9999);
     }
 
     /**
@@ -246,10 +246,18 @@ class Farmamedika
     public function savePharmacyTransaction($data)
     {
         try {
+    
+            // Ambil user ID dari sesi
+            $userId = $_SESSION['user_id'] ?? null;
+    
+            if (!$userId) {
+                throw new Exception("User tidak terautentikasi.");
+            }
+    
             $this->pdo->beginTransaction();
     
             // Generate invoice number
-            $invoiceNumber = $this->generateInvoiceNumber($user);
+            $invoiceNumber = $this->generateInvoiceNumber($userId);
     
             // Insert sale header
             $stmtHeader = $this->pdo->prepare("
@@ -265,7 +273,7 @@ class Farmamedika
                 $data['customer_name'],
                 $data['doctor_id'],
                 $data['prescription_number'],
-                $data['user_id'] ?? 1,
+                $userId, // Simpan user ID dari sesi
                 $data['subtotal'],
                 $data['tax_amount'],
                 $data['discount_amount'],
@@ -423,7 +431,7 @@ class Farmamedika
         }
     }
     
-    function loginUser($username, $password)
+    public function loginUser($username, $password)
     {
         try {
             $query = "SELECT * FROM users WHERE username = :username AND is_active = 1";
@@ -442,11 +450,24 @@ class Farmamedika
     
                 // Hapus password dari result untuk keamanan
                 unset($user['password']);
-    
+
                 // Simpan informasi pengguna ke session
                 $_SESSION['user_id'] = $user['user_id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
+    
+                // Buat cookie untuk sesi persisten
+                $sessionData = [
+                    'user_id' => $user['user_id'],
+                    'username' => $user['username'],
+                    'role' => $user['role']
+                ];
+    
+                // Enkripsi data sebelum disimpan di cookie
+                $encryptedData = base64_encode(json_encode($sessionData));
+    
+                // Set cookie dengan durasi 12 jam
+                setcookie('persistent_session', $encryptedData, time() + (12 * 60 * 60), "/", "", true, true); // HttpOnly dan Secure
     
                 return $user;
             }
@@ -456,6 +477,47 @@ class Farmamedika
             error_log("Database Error (loginUser): " . $e->getMessage());
             return false;
         }
+    }
+    
+    public function checkPersistentSession()
+    {
+    
+        // Periksa apakah sudah ada session aktif
+        if (isset($_SESSION['user_id'])) {
+            return true; // Pengguna sudah login
+        }
+    
+        // Periksa cookie persistent_session
+        if (isset($_COOKIE['persistent_session'])) {
+            $encryptedData = $_COOKIE['persistent_session'];
+            $sessionData = json_decode(base64_decode($encryptedData), true);
+    
+            if ($sessionData && isset($sessionData['user_id'])) {
+                // Restore session dari cookie
+                $_SESSION['user_id'] = $sessionData['user_id'];
+                $_SESSION['username'] = $sessionData['username'];
+                $_SESSION['role'] = $sessionData['role'];
+    
+                return true; // Pengguna berhasil login dari cookie
+            }
+        }
+    
+        return false; // Tidak ada sesi aktif
+    }
+    
+    public function logoutUser()
+    {
+        // Hapus session
+        session_unset();
+        session_destroy();
+    
+        // Hapus cookie
+        if (isset($_COOKIE['persistent_session'])) {
+            setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Menghapus cookie
+        }
+    
+        header("Location: signin.php");
+        exit;
     }
 
     public function registerUser($userData)
