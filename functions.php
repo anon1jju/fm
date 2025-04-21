@@ -78,9 +78,9 @@ class Farmamedika
      * Fungsi untuk membuat nomor invoice
      * @return string Format invoice APT-YYYYMMDD-XXXX
      */
-    public function generateInvoiceNumber()
+    public function generateInvoiceNumber($user)
     {
-        return 'APT-' . date('Ymd') . '-' . rand(1000, 9999);
+        return 'FM-'.$user.'-' . date('Ymd') . '-' . rand(1000, 9999);
     }
 
     /**
