@@ -78,9 +78,9 @@ class Farmamedika
      * Fungsi untuk membuat nomor invoice
      * @return string Format invoice APT-YYYYMMDD-XXXX
      */
-    public function generateInvoiceNumber($user)
+    public function generateInvoiceNumber()
     {
-        return 'FM-'.$user.'-' . date('Ymd') . '-' . rand(1000, 9999);
+        return 'APT-' . date('Ymd') . '-' . rand(1000, 9999);
     }
 
     /**
@@ -249,7 +249,7 @@ class Farmamedika
             $this->pdo->beginTransaction();
     
             // Generate invoice number
-            $invoiceNumber = $this->generateInvoiceNumber($user);
+            $invoiceNumber = $this->generateInvoiceNumber();
     
             // Insert sale header
             $stmtHeader = $this->pdo->prepare("
@@ -787,41 +787,46 @@ class Farmamedika
         }
     }
 
+    
     public function getReceiptData($saleId)
     {
         try {
+            // Ambil username dari session
+            $cashierName = $_SESSION['username'] ?? 'Unknown Cashier';
+    
             // Dapatkan informasi header transaksi
-            $query = "SELECT s.*, u.name as cashier_name, pm.method_name as payment_method,
+            $query = "SELECT s.*, pm.method_name as payment_method,
                          d.doctor_name
                   FROM sales s
-                  LEFT JOIN users u ON s.user_id = u.user_id
                   LEFT JOIN payment_methods pm ON s.payment_method_id = pm.payment_method_id
                   LEFT JOIN doctors d ON s.doctor_id = d.doctor_id
                   WHERE s.sale_id = :sale_id";
-
+    
             $stmt = $this->pdo->prepare($query);
             $stmt->bindParam(':sale_id', $saleId, PDO::PARAM_INT);
             $stmt->execute();
-
+    
             $sale = $stmt->fetch();
-
+    
             if (!$sale) {
                 return false;
             }
-
+    
+            // Tambahkan nama kasir dari session ke hasil
+            $sale['cashier_name'] = $cashierName;
+    
             // Dapatkan item transaksi
             $query = "SELECT si.*, p.product_name, p.kode_item, p.unit
                   FROM sale_items si
                   JOIN products p ON si.product_id = p.product_id
                   WHERE si.sale_id = :sale_id";
-
+    
             $stmt = $this->pdo->prepare($query);
             $stmt->bindParam(':sale_id', $saleId, PDO::PARAM_INT);
             $stmt->execute();
-
+    
             $items = $stmt->fetchAll();
-
-            // Dapatkan informasi apotek
+            
             // Catatan: Ini bisa diganti dengan pengambilan data dari tabel settings jika ada
             $pharmacy = [
                 'name' => 'Farma Medika',
@@ -830,7 +835,8 @@ class Farmamedika
                 'email' => 'info@farmamedika.com',
                 'footer_note' => 'Terima kasih atas kunjungan Anda.',
             ];
-
+    
+            // Gabungkan hasil
             return [
                 'pharmacy' => $pharmacy,
                 'sale' => $sale,
