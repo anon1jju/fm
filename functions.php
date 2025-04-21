@@ -249,7 +249,7 @@ class Farmamedika
             $this->pdo->beginTransaction();
     
             // Generate invoice number
-            $invoiceNumber = $this->generateInvoiceNumber();
+            $invoiceNumber = $this->generateInvoiceNumber($user);
     
             // Insert sale header
             $stmtHeader = $this->pdo->prepare("
