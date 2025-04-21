@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: ../cashier/cashier1.php");
                 break;
             default:
-                header("Location: index.php");
+                header("Location: signin.php");
         }
         exit;
     } else {
