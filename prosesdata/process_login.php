@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Redirect berdasarkan role pengguna
         switch ($_SESSION['role']) { // Menggunakan data dari session
             case 'admin':
-                header("Location: admin_dashboard.php");
+                header("Location: ../admin/admin_dashboard.php");
                 break;
             case 'cashier':
                 header("Location: ../cashier/cashier.php");
