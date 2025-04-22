@@ -1,12 +1,23 @@
 <?php
-require_once 'functions.php'; // Pastikan session_start() sudah ada di sini
+require_once 'functions.php';
 $error = isset($_SESSION['error']) ? $_SESSION['error'] : '';
-unset($_SESSION['error']); // Hapus error setelah ditampilkan
+unset($_SESSION['error']);
 
-if (!$farma->checkPersistentSession()) {
-    header("Location: signin.php");
+// Periksa apakah sesi masih ada
+if ($farma->checkPersistentSession()) {
+    // Ambil role pengguna dari sesi
+    $role = isset($_SESSION['role']) ? $_SESSION['role'] : '';
+
+    if ($role === 'admin') {
+        header("Location: admin_dashboard.php");
+    } elseif ($role === 'cashier') {
+        header("Location: cashier/cashier.php");
+    } else {
+        header("Location: default_dashboard.php"); // Default halaman jika role tidak ditentukan
+    }
     exit;
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -37,7 +48,7 @@ if (!$farma->checkPersistentSession()) {
                                     </div>
                                     <div class="text-center">
                                         <div class="mb-4">
-                                            <h3 class="mb-1">Selamat Datang</h3>
+                                            <h3 class="mb-1">Farma Medika</h3>
                                             <p>Silahkan login dengan akun anda</p>
                                         </div>
                                         <?php if ($error): ?>
@@ -91,10 +102,6 @@ if (!$farma->checkPersistentSession()) {
                                                         <a class="text-primary-600 hover:underline" href="forgot-password-simple.html">Forgot Password?</a>
                                                     </div>
                                                     <button class="btn btn-solid w-full" type="submit">Sign In</button>
-                                                    <div class="mt-4 text-center">
-                                                        <span>Don't have an account yet?</span>
-                                                        <a class="text-primary-600 hover:underline" href="signup-simple.html">Sign up</a>
-                                                    </div>
                                                 </div>
                                             </form>
                                         </div>
