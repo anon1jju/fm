@@ -1,7 +1,7 @@
 <?php
 
 session_start();
-
+date_default_timezone_set('Asia/Jakarta');
 /**
  * Functions.php - File kelas utama untuk POS Apotek
  *
@@ -857,8 +857,8 @@ class Farmamedika
     public function getReceiptData($saleId)
     {
         try {
-            // Dapatkan informasi header transaksi
-            $query = "SELECT s.*, u.name as cashier_name, pm.method_name as payment_method,
+            
+            $query = "SELECT s.*, u.username as cashier_name, pm.method_name as payment_method,
                          d.doctor_name
                   FROM sales s
                   LEFT JOIN users u ON s.user_id = u.user_id
@@ -918,207 +918,207 @@ class Farmamedika
 
         $html =
             '
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Struk Pembelian - ' .
-            $sale['invoice_number'] .
-            '</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                font-size: 12px;
-                margin: 0;
-                padding: 10px;
-            }
-            .receipt {
-                width: 80mm;
-                margin: 0 auto;
-            }
-            .header {
-                text-align: center;
-                margin-bottom: 10px;
-            }
-            .pharmacy-name {
-                font-size: 16px;
-                font-weight: bold;
-            }
-            .pharmacy-info {
-                font-size: 10px;
-            }
-            .invoice-info {
-                margin: 10px 0;
-                border-top: 1px dashed #000;
-                border-bottom: 1px dashed #000;
-                padding: 5px 0;
-            }
-            .invoice-info div {
-                display: flex;
-                justify-content: space-between;
-            }
-            .items {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 10px 0;
-            }
-            .items th {
-                text-align: left;
-                font-size: 10px;
-            }
-            .items td {
-                font-size: 10px;
-                padding: 2px 0;
-            }
-            .item-detail {
-                font-size: 9px;
-                color: #555;
-            }
-            .totals {
-                margin: 10px 0;
-                text-align: right;
-            }
-            .totals div {
-                display: flex;
-                justify-content: space-between;
-            }
-            .grand-total {
-                font-weight: bold;
-                font-size: 14px;
-                border-top: 1px solid #000;
-                padding-top: 5px;
-            }
-            .footer {
-                text-align: center;
-                margin-top: 10px;
-                font-size: 10px;
-                border-top: 1px dashed #000;
-                padding-top: 5px;
-            }
-            @media print {
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Struk Pembelian - ' .
+                $sale['invoice_number'] .
+                '</title>
+            <style>
                 body {
+                    font-family: Arial, sans-serif;
+                    font-size: 12px;
+                    margin: 0;
+                    padding: 10px;
+                }
+                .receipt {
                     width: 80mm;
+                    margin: 0 auto;
                 }
-                .no-print {
-                    display: none;
+                .header {
+                    text-align: center;
+                    margin-bottom: 10px;
                 }
+                .pharmacy-name {
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                .pharmacy-info {
+                    font-size: 10px;
+                }
+                .invoice-info {
+                    margin: 10px 0;
+                    border-top: 1px dashed #000;
+                    border-bottom: 1px dashed #000;
+                    padding: 5px 0;
+                }
+                .invoice-info div {
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .items {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 10px 0;
+                }
+                .items th {
+                    text-align: left;
+                    font-size: 10px;
+                }
+                .items td {
+                    font-size: 10px;
+                    padding: 2px 0;
+                }
+                .item-detail {
+                    font-size: 9px;
+                    color: #555;
+                }
+                .totals {
+                    margin: 10px 0;
+                    text-align: right;
+                }
+                .totals div {
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .grand-total {
+                    font-weight: bold;
+                    font-size: 14px;
+                    border-top: 1px solid #000;
+                    padding-top: 5px;
+                }
+                .footer {
+                    text-align: center;
+                    margin-top: 10px;
+                    font-size: 10px;
+                    border-top: 1px dashed #000;
+                    padding-top: 5px;
+                }
+                @media print {
+                    body {
+                        width: 80mm;
+                    }
+                    .no-print {
+                        display: none;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="receipt">
+                <div class="header">
+                    <div class="pharmacy-name">' .
+                $pharmacy['name'] .
+                '</div>
+                    <div class="pharmacy-info">' .
+                $pharmacy['address'] .
+                '</div>
+                    <div class="pharmacy-info">Telp: ' .
+                $pharmacy['phone'] .
+                '</div>
+                </div>
+                
+                <div class="invoice-info">
+                    <div><span>No. Invoice:</span> <span>' .
+                $sale['invoice_number'] .
+                '</span></div>
+                    <div><span>Tanggal:</span> <span>' .
+                date('d/m/Y H:i', strtotime($sale['sale_date'])) .
+                '</span></div>
+                    <div><span>Kasir:</span> <span>' .
+                $sale['cashier_name'] .
+                '</span></div>';
+    
+            if ($sale['customer_name']) {
+                $html .= '<div><span>Pelanggan:</span> <span>' . $sale['customer_name'] . '</span></div>';
             }
-        </style>
-    </head>
-    <body>
-        <div class="receipt">
-            <div class="header">
-                <div class="pharmacy-name">' .
-            $pharmacy['name'] .
-            '</div>
-                <div class="pharmacy-info">' .
-            $pharmacy['address'] .
-            '</div>
-                <div class="pharmacy-info">Telp: ' .
-            $pharmacy['phone'] .
-            '</div>
-            </div>
-            
-            <div class="invoice-info">
-                <div><span>No. Invoice:</span> <span>' .
-            $sale['invoice_number'] .
-            '</span></div>
-                <div><span>Tanggal:</span> <span>' .
-            date('d/m/Y H:i', strtotime($sale['sale_date'])) .
-            '</span></div>
-                <div><span>Kasir:</span> <span>' .
-            $sale['cashier_name'] .
-            '</span></div>';
-
-        if ($sale['customer_name']) {
-            $html .= '<div><span>Pelanggan:</span> <span>' . $sale['customer_name'] . '</span></div>';
-        }
-
-        if ($sale['doctor_name']) {
-            $html .= '<div><span>Dokter:</span> <span>' . $sale['doctor_name'] . '</span></div>';
-            $html .= '<div><span>No. Resep:</span> <span>' . $sale['prescription_number'] . '</span></div>';
-        }
-
-        $html .= '
-            </div>
-            
-            <table class="items">
-                <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th style="text-align: right;">Harga</th>
-                    <th style="text-align: right;">Total</th>
-                </tr>';
-
-        foreach ($items as $item) {
+    
+            if ($sale['doctor_name']) {
+                $html .= '<div><span>Dokter:</span> <span>' . $sale['doctor_name'] . '</span></div>';
+                $html .= '<div><span>No. Resep:</span> <span>' . $sale['prescription_number'] . '</span></div>';
+            }
+    
+            $html .= '
+                </div>
+                
+                <table class="items">
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th style="text-align: right;">Harga</th>
+                        <th style="text-align: right;">Total</th>
+                    </tr>';
+    
+            foreach ($items as $item) {
+                $html .=
+                    '
+                    <tr>
+                        <td>
+                            ' .
+                    $item['product_name'] .
+                    '<br>
+                            <span class="item-detail">' .
+                    $item['kode_item'] .
+                    '</span>
+                        </td>
+                        <td>' .
+                    $item['quantity'] .
+                    ' ' .
+                    $item['unit'] .
+                    '</td>
+                        <td style="text-align: right;">Rp ' .
+                    number_format($item['unit_price'], 0, ',', '.') .
+                    '</td>
+                        <td style="text-align: right;">Rp ' .
+                    number_format($item['item_total'], 0, ',', '.') .
+                    '</td>
+                    </tr>';
+            }
+    
             $html .=
                 '
-                <tr>
-                    <td>
-                        ' .
-                $item['product_name'] .
+                </table>
+                
+                <div class="totals">
+                    <div><span>Subtotal:</span> <span>Rp ' .
+                number_format($sale['subtotal'], 0, ',', '.') .
+                '</span></div>';
+    
+            if ($sale['tax_amount'] > 0) {
+                $html .= '<div><span>Pajak:</span> <span>Rp ' . number_format($sale['tax_amount'], 0, ',', '.') . '</span></div>';
+            }
+    
+            if ($sale['discount_amount'] > 0) {
+                $html .= '<div><span>Diskon:</span> <span>Rp ' . number_format($sale['discount_amount'], 0, ',', '.') . '</span></div>';
+            }
+    
+            $html .=
+                '
+                    <div class="grand-total"><span>Total:</span> <span>Rp ' .
+                number_format($sale['total_amount'], 0, ',', '.') .
+                '</span></div>
+                    <div><span>Metode Pembayaran:</span> <span>' .
+                $sale['payment_method'] .
+                '</span></div>
+                </div>
+                
+                <div class="footer">
+                    ' .
+                $pharmacy['footer_note'] .
                 '<br>
-                        <span class="item-detail">' .
-                $item['kode_item'] .
-                '</span>
-                    </td>
-                    <td>' .
-                $item['quantity'] .
-                ' ' .
-                $item['unit'] .
-                '</td>
-                    <td style="text-align: right;">Rp ' .
-                number_format($item['unit_price'], 0, ',', '.') .
-                '</td>
-                    <td style="text-align: right;">Rp ' .
-                number_format($item['item_total'], 0, ',', '.') .
-                '</td>
-                </tr>';
-        }
-
-        $html .=
-            '
-            </table>
-            
-            <div class="totals">
-                <div><span>Subtotal:</span> <span>Rp ' .
-            number_format($sale['subtotal'], 0, ',', '.') .
-            '</span></div>';
-
-        if ($sale['tax_amount'] > 0) {
-            $html .= '<div><span>Pajak:</span> <span>Rp ' . number_format($sale['tax_amount'], 0, ',', '.') . '</span></div>';
-        }
-
-        if ($sale['discount_amount'] > 0) {
-            $html .= '<div><span>Diskon:</span> <span>Rp ' . number_format($sale['discount_amount'], 0, ',', '.') . '</span></div>';
-        }
-
-        $html .=
-            '
-                <div class="grand-total"><span>Total:</span> <span>Rp ' .
-            number_format($sale['total_amount'], 0, ',', '.') .
-            '</span></div>
-                <div><span>Metode Pembayaran:</span> <span>' .
-            $sale['payment_method'] .
-            '</span></div>
+                    ' .
+                date('d/m/Y H:i:s') .
+                '
+                </div>
+                
+                <div class="no-print" style="text-align: center; margin-top: 20px;">
+                    <button onclick="window.print()">Cetak Struk</button>
+                    <button onclick="window.close()">Tutup</button>
+                </div>
             </div>
-            
-            <div class="footer">
-                ' .
-            $pharmacy['footer_note'] .
-            '<br>
-                ' .
-            date('d/m/Y H:i:s') .
-            '
-            </div>
-            
-            <div class="no-print" style="text-align: center; margin-top: 20px;">
-                <button onclick="window.print()">Cetak Struk</button>
-                <button onclick="window.close()">Tutup</button>
-            </div>
-        </div>
-    </body>
-    </html>';
+        </body>
+        </html>';
 
         return $html;
     }
