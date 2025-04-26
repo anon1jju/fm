@@ -1379,11 +1379,16 @@ $users = $farma->getAllUsers();
 
                                     <form method="POST" action="../prosesdata/process_edit_user.php">
                                         <div class="ti-modal-body">
+                                          <input type="hidden" name="original_username" value="<?= htmlspecialchars($user['username']) ?>" />
                                             <label for="edit-nama-pengguna-<?= htmlspecialchars($user['username']) ?>" class="ti-form-label text-sm">Nama Pengguna</label>
                                             <input type="text" name="nama_pengguna" id="edit-nama-pengguna-<?= htmlspecialchars($user['username']) ?>" value="<?= htmlspecialchars($user['name']) ?>" class="ti-form-input text-md py-2" required />
 
                                             <label for="edit-username-<?= htmlspecialchars($user['username']) ?>" class="ti-form-label text-sm">Username</label>
                                             <input type="text" name="username" id="edit-username-<?= htmlspecialchars($user['username']) ?>" value="<?= htmlspecialchars($user['username']) ?>" class="ti-form-input text-md py-2" required />
+
+                                            
+                                            <label for="edit-password-<?= htmlspecialchars($user['username']) ?>" class="ti-form-label text-sm">Password</label>
+                                            <input type="text" name="password" id="edit-password-<?= htmlspecialchars($user['username']) ?>" placeholder="Kosongkan jika tidak ingin mengubah" class="ti-form-input text-md py-2" />
 
                                             <label for="edit-hak-akses-<?= htmlspecialchars($user['username']) ?>" class="ti-form-label text-sm">Hak Akses</label>
                                             <select name="hak_akses" id="edit-hak-akses-<?= htmlspecialchars($user['username']) ?>" class="ti-form-input text-md py-2" required>
