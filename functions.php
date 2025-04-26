@@ -15,6 +15,8 @@ date_default_timezone_set('Asia/Jakarta');
 class Farmamedika
 {
     private $pdo;
+    //private $logout = __DIR__ . "/filtered";
+    public $logout = "../logout.php";
 
     /**
      * Konstruktur untuk menginisialisasi koneksi database
@@ -171,6 +173,71 @@ class Farmamedika
         } catch (PDOException $e) {
             error_log("Database Error (getProductById): " . $e->getMessage());
             return false;
+        }
+    }
+    
+    public function getAllUsers()
+    {
+        try {
+            $query = "SELECT name, username, role, last_login, created_at FROM users ORDER BY created_at DESC";
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute();
+    
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Database Error (getAllUsers): " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    public function deleteUser($username)
+    {
+        try {
+            $query = "DELETE FROM users WHERE username = :username";
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':username', $username);
+            $stmt->execute();
+    
+            return ['success' => true, 'message' => 'Pengguna berhasil dihapus.'];
+        } catch (PDOException $e) {
+            error_log("Database Error (deleteUser): " . $e->getMessage());
+            return ['success' => false, 'message' => 'Terjadi kesalahan saat menghapus pengguna.'];
+        }
+    }
+    
+    public function updateUser($original_username, $data)
+    {
+        try {
+            $query = "UPDATE users SET username = :new_username, name = :name, role = :role";
+    
+            // Tambahkan password ke query jika ada
+            if (!empty($data['password'])) {
+                $query .= ", password = :password";
+            }
+    
+            $query .= " WHERE username = :original_username";
+    
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':new_username', $data['username']);
+            $stmt->bindParam(':name', $data['name']);
+            $stmt->bindParam(':role', $data['role']);
+            $stmt->bindParam(':original_username', $original_username);
+    
+            // Bind password jika ada
+            if (!empty($data['password'])) {
+                $stmt->bindParam(':password', $data['password']);
+            }
+    
+            $stmt->execute();
+    
+            if ($stmt->rowCount() === 0) {
+                return ['success' => false, 'message' => 'Tidak ada perubahan yang terjadi. Username mungkin tidak ditemukan.'];
+            }
+    
+            return ['success' => true, 'message' => 'Pengguna berhasil diperbarui.'];
+        } catch (PDOException $e) {
+            error_log("Database Error (updateUser): " . $e->getMessage());
+            return ['success' => false, 'message' => 'Terjadi kesalahan saat memperbarui pengguna.'];
         }
     }
 
