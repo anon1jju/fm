@@ -978,7 +978,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
                             <img src="../assets/images/faces/2.jpg" alt="img" class="avatar avatar-sm avatar-rounded mb-0">
                         </div>
                         <div class="xl:block hidden leading-none">
-                            <span class="font-medium leading-none dark:text-defaulttextcolor/70"><? echo $_SESSION["username"]; ?></span>
+                            <span class="font-medium leading-none dark:text-defaulttextcolor/70"><? echo $_SESSION["name"]; ?></span>
                         </div>
                     </div>
                 </a>
@@ -989,7 +989,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
                         <div
                             class="py-2 px-4 text-center block">
                             <span class="font-semibold">
-                                <? echo $_SESSION["username"]; ?>
+                                <? echo $_SESSION["name"]; ?>
                             </span>
                             <span class="block text-xs text-textmuted dark:text-textmuted/50"><? echo $_SESSION["username"]; ?></span>
                         </div>
@@ -1124,7 +1124,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
                 <!-- End::slide -->
 
                 <!-- Start::slide__category -->
-                <li class="slide__categor"><span class="category-name">Laporan</span></li>
+                <li class="slide__category"><span class="category-name">Laporan</span></li>
                 <!-- End::slide__category -->
 
                 <!-- Start::slide -->
@@ -2342,21 +2342,18 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
         </div>
         <!-- End::app-content -->
 
-
-        
 <footer class="mt-auto py-4 bg-white dark:bg-bodybg text-center border-t border-defaultborder dark:border-defaultborder/10">
-    <div class="container">
-        <span class="text-textmuted dark:text-textmuted/50">
-            Copyright © <span id="year"></span> 
-            <a href="javascript:void(0);" class="text-dark font-medium dark:text-defaulttextcolor/80">Zynix</a>.
-            Designed with <span class="bi bi-heart-fill text-danger"></span> by 
-            <a href="https://spruko.com/" target="_blank">
-                <span class="font-medium text-primary">Spruko</span>
-            </a>
-            All rights reserved
-        </span>
-    </div>
-</footer>
+            <div class="container">
+                <span class="text-textmuted dark:text-textmuted/50">
+                    <span id="year"></span> Developed by
+                    <a href="javascript:void(0);" class="text-dark font-medium dark:text-defaulttextcolor/80">Afra</a>.
+                    <a href="#" target="_blank">
+                        <span class="font-medium text-primary"> Design by Spruko</span>
+                    </a>
+                    All rights reserved
+                </span>
+            </div>
+        </footer>
 
         <div class="hs-overlay ti-modal hidden" id="header-responsive-search" tabindex="-1" aria-labelledby="header-responsive-search" aria-hidden="true">
     <div class="ti-modal-box">
