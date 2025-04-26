@@ -1358,7 +1358,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
                 </div>
             </footer>
 
-            <div class="hs-overlay ti-modal hidden" id="header-responsive-search" tabindex="-1" aria-labelledby="header-responsive-search" aria-hidden="true">
+            <!--<div class="hs-overlay ti-modal hidden" id="header-responsive-search" tabindex="-1" aria-labelledby="header-responsive-search" aria-hidden="true">
                 <div class="ti-modal-box">
                     <div class="ti-modal-dialog">
                         <div class="ti-modal-content">
@@ -1373,7 +1373,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>-->
         </div>
 
         <!-- Scroll To Top -->
