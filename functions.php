@@ -309,6 +309,30 @@ class Farmamedika
             return [];
         }
     }
+    
+    public function tambahBarang($product_name, $kode_item, $barcode, $category_id, $modal, $jual, $unit, $stock_quantity, $minimum_stock)
+    {
+        try {
+            $query = "INSERT INTO products (product_name, kode_item, barcode, category_id, modal, jual, unit, stock_quantity, minimum_stock, is_active) 
+                      VALUES (:product_name, :kode_item, :barcode, :category_id, :modal, :jual, :unit, :stock_quantity, :minimum_stock, 1)";
+            $stmt = $this->pdo->prepare($query);
+    
+            $stmt->bindParam(':product_name', $product_name);
+            $stmt->bindParam(':kode_item', $kode_item);
+            $stmt->bindParam(':barcode', $barcode);
+            $stmt->bindParam(':category_id', $category_id, PDO::PARAM_INT);
+            $stmt->bindParam(':modal', $modal);
+            $stmt->bindParam(':jual', $jual);
+            $stmt->bindParam(':unit', $unit);
+            $stmt->bindParam(':stock_quantity', $stock_quantity, PDO::PARAM_INT);
+            $stmt->bindParam(':minimum_stock', $minimum_stock, PDO::PARAM_INT);
+    
+            return $stmt->execute();
+        } catch (PDOException $e) {
+            error_log("Database Error (tambahBarang): " . $e->getMessage());
+            return false;
+        }
+    }
 
     public function savePharmacyTransaction($data)
     {
@@ -522,19 +546,22 @@ class Farmamedika
                 $_SESSION['user_id'] = $user['user_id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
+                $_SESSION['name'] = $user['name'];
+                
     
                 // Buat cookie untuk sesi persisten
                 $sessionData = [
                     'user_id' => $user['user_id'],
                     'username' => $user['username'],
-                    'role' => $user['role']
+                    'role' => $user['role'],
+                    'name' => $user['name'],
                 ];
     
                 // Enkripsi data sebelum disimpan di cookie
                 $encryptedData = base64_encode(json_encode($sessionData));
     
                 // Set cookie dengan durasi 12 jam
-                setcookie('persistent_session', $encryptedData, time() + (12 * 60 * 60), "/", "", true, true); // HttpOnly dan Secure
+                setcookie('persistent_session', $encryptedData, time() + (6 * 60 * 60), "/", "", true, true); // HttpOnly dan Secure
     
                 return $user;
             }
@@ -561,9 +588,10 @@ class Farmamedika
     
             if ($sessionData && isset($sessionData['user_id'])) {
                 // Restore session dari cookie
-                $_SESSION['user_id'] = $sessionData['user_id'];
-                $_SESSION['username'] = $sessionData['username'];
-                $_SESSION['role'] = $sessionData['role'];
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                $_SESSION['name'] = $user['name'];
     
                 return true; // Pengguna berhasil login dari cookie
             }
@@ -888,6 +916,32 @@ class Farmamedika
         } catch (PDOException $e) {
             error_log("Database Error (getProductDetailForCashier): " . $e->getMessage());
             return false;
+        }
+    }
+    
+    public function daysUntilExpire($expire_date) 
+    {
+        $current_date = date('d-m-Y'); // Tanggal hari ini
+
+        // Menghitung selisih antara tanggal sekarang dan tanggal expired
+        $expire_timestamp = strtotime($expire_date);
+        $current_timestamp = strtotime($current_date);
+
+        // Menghitung jumlah hari
+        $diff = $expire_timestamp - $current_timestamp;
+        $days_left = floor($diff / (60 * 60 * 24));
+
+        if ($days_left < 0) {
+            return json_encode([
+                'status' => 'expired',
+                'message' => 'Tanggal expired sudah lewat.'
+            ]);
+        } else {
+            return json_encode([
+                'status' => 'active',
+                'days_left' => $days_left,
+                'message' => "Tinggal $days_left hari lagi sampai expired."
+            ]);
         }
     }
 
