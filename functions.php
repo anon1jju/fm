@@ -89,19 +89,59 @@ class Farmamedika
      * Mendapatkan semua data produk
      * @return array Daftar produk
      */
-    public function getAllProducts()
+    
+    
+    /*public function getAllProducts()
     {
         try {
-            $query = "SELECT p.*, c.category_name, mt.type_name
+            $query = "SELECT p.*, c.category_name, mt.type_name, pb.expiry_date
                       FROM products p
                       LEFT JOIN product_categories c ON p.category_id = c.category_id
                       LEFT JOIN medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
+                      LEFT JOIN product_batches pb ON p.product_id = pb.product_id
                       WHERE p.is_active = 1
                       ORDER BY p.product_name";
-
+    
             $stmt = $this->pdo->prepare($query);
             $stmt->execute();
-
+    
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Database Error (getAllProducts): " . $e->getMessage());
+            return [];
+        }
+    }*/
+    
+    public function getAllProducts()
+    {
+        try {
+            $query = "SELECT 
+                        p.*, 
+                        c.category_name, 
+                        mt.type_name,
+                        pb.expiry_date,
+                        pb.batch_number,  -- Menambahkan batch_number dari tabel product_batches
+                        s.supplier_name
+                      FROM 
+                        products p
+                      LEFT JOIN 
+                        product_categories c ON p.category_id = c.category_id
+                      LEFT JOIN 
+                        medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
+                      LEFT JOIN 
+                        product_batches pb ON p.product_id = pb.product_id
+                      LEFT JOIN 
+                        suppliers s ON pb.supplier_id = s.supplier_id
+                      WHERE 
+                        p.is_active = 1
+                      GROUP BY 
+                        p.product_id
+                      ORDER BY 
+                        p.product_name";
+    
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute();
+    
             return $stmt->fetchAll();
         } catch (PDOException $e) {
             error_log("Database Error (getAllProducts): " . $e->getMessage());
@@ -198,17 +238,22 @@ class Farmamedika
             $stmt->bindParam(':username', $username);
             $stmt->execute();
     
-            return ['success' => true, 'message' => 'Pengguna berhasil dihapus.'];
+            if ($stmt->rowCount() > 0) {
+                return ['success' => true, 'message' => 'Pengguna berhasil dihapus.'];
+            } else {
+                return ['success' => false, 'message' => 'Pengguna tidak ditemukan.'];
+            }
         } catch (PDOException $e) {
             error_log("Database Error (deleteUser): " . $e->getMessage());
-            return ['success' => false, 'message' => 'Terjadi kesalahan saat menghapus pengguna.'];
+            return ['success' => false, 'message' => 'Terjadi kesalahan pada database.'];
         }
     }
     
-    public function updateUser($original_username, $data)
+    public function updateUser($original_username, $data, $updated_by)
     {
         try {
-            $query = "UPDATE users SET username = :new_username, name = :name, role = :role";
+            // Awal query update
+            $query = "UPDATE users SET username = :new_username, name = :name, role = :role, updated_by = :updated_by, updated_at = NOW()";
     
             // Tambahkan password ke query jika ada
             if (!empty($data['password'])) {
@@ -221,15 +266,18 @@ class Farmamedika
             $stmt->bindParam(':new_username', $data['username']);
             $stmt->bindParam(':name', $data['name']);
             $stmt->bindParam(':role', $data['role']);
+            $stmt->bindParam(':updated_by', $updated_by); // ID admin/user yang memperbarui
             $stmt->bindParam(':original_username', $original_username);
     
-            // Bind password jika ada
+            // Hash dan bind password jika ada
             if (!empty($data['password'])) {
-                $stmt->bindParam(':password', $data['password']);
+                $hashedPassword = password_hash($data['password'], PASSWORD_DEFAULT);
+                $stmt->bindParam(':password', $hashedPassword);
             }
     
             $stmt->execute();
     
+            // Cek apakah ada perubahan
             if ($stmt->rowCount() === 0) {
                 return ['success' => false, 'message' => 'Tidak ada perubahan yang terjadi. Username mungkin tidak ditemukan.'];
             }
@@ -310,20 +358,22 @@ class Farmamedika
         }
     }
     
-    public function tambahBarang($product_name, $kode_item, $barcode, $category_id, $modal, $jual, $unit, $stock_quantity, $minimum_stock)
+    public function tambahBarang($product_name, $kode_item, $barcode, $posisi, $category_id, $modal, $jual, $unit, $expire, $stock_quantity, $minimum_stock)
     {
         try {
-            $query = "INSERT INTO products (product_name, kode_item, barcode, category_id, modal, jual, unit, stock_quantity, minimum_stock, is_active) 
-                      VALUES (:product_name, :kode_item, :barcode, :category_id, :modal, :jual, :unit, :stock_quantity, :minimum_stock, 1)";
+            $query = "INSERT INTO products (product_name, kode_item, barcode, posisi, category_id, modal, jual, unit, expire, stock_quantity, minimum_stock, is_active) 
+                      VALUES (:product_name, :kode_item, :barcode, :posisi, :category_id, :modal, :jual, :unit, :expire, :stock_quantity, :minimum_stock, 1)";
             $stmt = $this->pdo->prepare($query);
     
             $stmt->bindParam(':product_name', $product_name);
             $stmt->bindParam(':kode_item', $kode_item);
             $stmt->bindParam(':barcode', $barcode);
+            $stmt->bindParam(':posisi', $posisi);
             $stmt->bindParam(':category_id', $category_id, PDO::PARAM_INT);
             $stmt->bindParam(':modal', $modal);
             $stmt->bindParam(':jual', $jual);
             $stmt->bindParam(':unit', $unit);
+            $stmt->bindParam(':expire', $expire);
             $stmt->bindParam(':stock_quantity', $stock_quantity, PDO::PARAM_INT);
             $stmt->bindParam(':minimum_stock', $minimum_stock, PDO::PARAM_INT);
     
@@ -615,7 +665,7 @@ class Farmamedika
         exit;
     }
 
-    public function registerUser($userData)
+    public function registerUser($userData, $adminId)
     {
         try {
             // Cek apakah username sudah ada
@@ -624,28 +674,29 @@ class Farmamedika
             $stmt->bindParam(':username', $userData['username']);
             $stmt->execute();
             $result = $stmt->fetch();
-
+    
             if ($result['count'] > 0) {
                 return [
                     'success' => false,
                     'message' => 'Username sudah digunakan',
                 ];
             }
-
+    
             // Hash password
             $hashedPassword = password_hash($userData['password'], PASSWORD_DEFAULT);
-
+    
             // Insert user baru
-            $query = "INSERT INTO users (username, password, name, role) 
-                      VALUES (:username, :password, :name, :role)";
-
+            $query = "INSERT INTO users (username, password, name, role, is_active, created_by) 
+                      VALUES (:username, :password, :name, :role, 1, :created_by)";
+    
             $stmt = $this->pdo->prepare($query);
             $stmt->bindParam(':username', $userData['username']);
             $stmt->bindParam(':password', $hashedPassword);
             $stmt->bindParam(':name', $userData['name']);
             $stmt->bindParam(':role', $userData['role']);
+            $stmt->bindParam(':created_by', $adminId); // Admin ID yang membuat user
             $stmt->execute();
-
+    
             return [
                 'success' => true,
                 'message' => 'User berhasil didaftarkan',
