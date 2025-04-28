@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: ../admin/list_users.php");
         exit();
     }
-    
+
     // Periksa apakah username sudah ada
     try {
         $pdo = $farma->getPDO();
@@ -37,6 +37,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
+    // Pastikan admin ID tersedia di session
+    if (!isset($_SESSION['user_id'])) {
+        $_SESSION['error_message'] = "Akses tidak valid.";
+        header("Location: ../admin/list_users.php");
+        exit();
+    }
+    $adminId = $_SESSION['user_id']; // ID admin yang membuat user
+
     // Persiapkan data pengguna untuk didaftarkan
     $userData = [
         'name' => $nama_pengguna,
@@ -46,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     // Panggil fungsi registerUser
-    $result = $farma->registerUser($userData);
+    $result = $farma->registerUser($userData, $adminId); // Tambahkan admin ID
 
     if ($result['success']) {
         // Set pesan sukses
