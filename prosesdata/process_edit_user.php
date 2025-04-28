@@ -1,34 +1,50 @@
 <?php
 require_once '../functions.php';
 
-// Periksa apakah data dikirim melalui metode POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Ambil data dari form
-    $username = trim($_POST['username']);
+    $original_username = trim($_POST['original_username']); // Username lama
+    $username = trim($_POST['username']); // Username baru
+    $password = trim($_POST['password']);
     $nama_pengguna = trim($_POST['nama_pengguna']);
     $hak_akses = trim($_POST['hak_akses']);
 
-    // Validasi input
-    if (empty($username) || empty($nama_pengguna) || empty($hak_akses)) {
+    // Debugging
+    error_log("Data diterima: Original Username={$original_username}, Username Baru={$username}, Nama Pengguna={$nama_pengguna}, Hak Akses={$hak_akses}");
+
+    // Validasi input wajib
+    if (empty($original_username) || empty($username) || empty($nama_pengguna) || empty($hak_akses)) {
         $_SESSION['error_message'] = "Semua field wajib diisi.";
-        header("Location: ../admin/list_users.php"); // Redirect kembali ke halaman daftar user
+        header("Location: ../admin/list_users.php");
         exit();
     }
-    // Data yang akan diperbarui
+
+    // Periksa apakah admin ID tersedia di session
+    if (!isset($_SESSION['user_id'])) {
+        $_SESSION['error_message'] = "Akses tidak valid.";
+        header("Location: ../admin/list_users.php");
+        exit();
+    }
+    $adminId = $_SESSION['user_id']; // ID admin yang memperbarui data
+
+    // Array data untuk pembaruan
     $data = [
+        'username' => $username, // Username baru
         'name' => $nama_pengguna,
         'role' => $hak_akses,
     ];
 
-    try {
-        // Panggil fungsi updateUser untuk memperbarui data di database
-        $result = $farma->updateUser($username, $data);
+    // Tambahkan password jika diisi
+    if (!empty($password)) {
+        $hashedPassword = password_hash($password, PASSWORD_BCRYPT); // Hash password baru
+        $data['password'] = $hashedPassword;
+    }
 
+    try {
+        // Panggil fungsi updateUser dengan ID admin
+        $result = $farma->updateUser($original_username, $data, $adminId); // Gunakan username lama
         if ($result['success']) {
-            // Jika berhasil, set pesan sukses
             $_SESSION['success_message'] = $result['message'];
         } else {
-            // Jika gagal, set pesan error
             $_SESSION['error_message'] = $result['message'];
         }
     } catch (Exception $e) {
@@ -36,12 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['error_message'] = "Terjadi kesalahan saat memperbarui pengguna.";
     }
 
-    // Redirect kembali ke halaman daftar user
-    header("Location: ../admin/list_users.php");
-    exit();
-} else {
-    // Jika metode bukan POST, set pesan error
-    $_SESSION['error_message'] = "Metode tidak valid.";
     header("Location: ../admin/list_users.php");
     exit();
 }
