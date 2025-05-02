@@ -92,22 +92,34 @@ class Farmamedika
             error_log("getSuppliers Error: No valid PDO connection.");
             return []; // Kembalikan array kosong jika tidak ada koneksi
         }
-
-        // Kolom yang akan diambil (sesuai struktur setelah menghapus email/address)
-        $sql = "SELECT supplier_id, supplier_name, contact_person, phone, is_active 
-                FROM suppliers 
-                ORDER BY supplier_name ASC"; // Urutkan berdasarkan nama supplier
-
+    
+        // Query yang diperbarui untuk menghubungkan tabel suppliers dan product_batches
+        $sql = "SELECT 
+                    s.supplier_id, 
+                    s.supplier_name, 
+                    s.contact_person, 
+                    s.phone, 
+                    s.is_active,
+                    GROUP_CONCAT(DISTINCT pb.product_id) AS related_product_ids
+                FROM 
+                    suppliers s
+                LEFT JOIN 
+                    product_batches pb ON s.supplier_id = pb.supplier_id
+                GROUP BY 
+                    s.supplier_id
+                ORDER BY 
+                    s.supplier_name ASC"; // Urutkan berdasarkan nama supplier
+    
         try {
             // Siapkan dan eksekusi statement
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute();
-
+    
             // Ambil semua hasil sebagai associative array
-            $suppliers = $stmt->fetchAll(); 
+            $suppliers = $stmt->fetchAll();
             
             return $suppliers; // Kembalikan array hasil
-
+    
         } catch (PDOException $e) {
             // Log error jika query gagal
             error_log("PDO Error fetching suppliers: " . $e->getMessage());
