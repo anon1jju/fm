@@ -75,7 +75,7 @@ class Farmamedika
         ]);
         exit();
     }
-
+    
     /**
      * Fungsi untuk membuat nomor invoice
      * @return string Format invoice APT-YYYYMMDD-XXXX
@@ -83,6 +83,36 @@ class Farmamedika
     public function generateInvoiceNumber($user)
     {
         return 'FM-'.$user.'-'. date('Ymd') . '-' . rand(1000, 9999);
+    }
+    
+    public function getSuppliers()
+    {
+        // Periksa apakah koneksi PDO valid
+        if (!$this->pdo) {
+            error_log("getSuppliers Error: No valid PDO connection.");
+            return []; // Kembalikan array kosong jika tidak ada koneksi
+        }
+
+        // Kolom yang akan diambil (sesuai struktur setelah menghapus email/address)
+        $sql = "SELECT supplier_id, supplier_name, contact_person, phone, is_active 
+                FROM suppliers 
+                ORDER BY supplier_name ASC"; // Urutkan berdasarkan nama supplier
+
+        try {
+            // Siapkan dan eksekusi statement
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute();
+
+            // Ambil semua hasil sebagai associative array
+            $suppliers = $stmt->fetchAll(); 
+            
+            return $suppliers; // Kembalikan array hasil
+
+        } catch (PDOException $e) {
+            // Log error jika query gagal
+            error_log("PDO Error fetching suppliers: " . $e->getMessage());
+            return []; // Kembalikan array kosong jika terjadi error
+        }
     }
 
     /**
@@ -233,17 +263,20 @@ class Farmamedika
     public function deleteUser($username)
     {
         try {
+            // Query untuk menghapus pengguna berdasarkan username
             $query = "DELETE FROM users WHERE username = :username";
             $stmt = $this->pdo->prepare($query);
-            $stmt->bindParam(':username', $username);
+            $stmt->bindParam(':username', $username, PDO::PARAM_STR);
             $stmt->execute();
     
+            // Periksa apakah ada baris yang terpengaruh (berarti pengguna ditemukan dan dihapus)
             if ($stmt->rowCount() > 0) {
                 return ['success' => true, 'message' => 'Pengguna berhasil dihapus.'];
             } else {
                 return ['success' => false, 'message' => 'Pengguna tidak ditemukan.'];
             }
         } catch (PDOException $e) {
+            // Log kesalahan jika terjadi error pada database
             error_log("Database Error (deleteUser): " . $e->getMessage());
             return ['success' => false, 'message' => 'Terjadi kesalahan pada database.'];
         }
@@ -286,6 +319,30 @@ class Farmamedika
         } catch (PDOException $e) {
             error_log("Database Error (updateUser): " . $e->getMessage());
             return ['success' => false, 'message' => 'Terjadi kesalahan saat memperbarui pengguna.'];
+        }
+    }
+    
+    public function getAllCategoriesWithProductCount()
+    {
+        try {
+            $query = "
+                SELECT 
+                    c.category_id, 
+                    c.category_name, 
+                    c.description, 
+                    COUNT(p.product_id) AS product_count
+                FROM product_categories c
+                LEFT JOIN products p ON c.category_id = p.category_id
+                GROUP BY c.category_id
+                ORDER BY c.category_name
+            ";
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute();
+    
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Database Error (getAllCategoriesWithProductCount): " . $e->getMessage());
+            return [];
         }
     }
 
@@ -623,31 +680,70 @@ class Farmamedika
         }
     }
     
-    public function checkPersistentSession()
+        public function checkPersistentSession()
     {
-    
         // Periksa apakah sudah ada session aktif
         if (isset($_SESSION['user_id'])) {
             return true; // Pengguna sudah login
         }
-    
+
         // Periksa cookie persistent_session
         if (isset($_COOKIE['persistent_session'])) {
-            $encryptedData = $_COOKIE['persistent_session'];
-            $sessionData = json_decode(base64_decode($encryptedData), true);
-    
-            if ($sessionData && isset($sessionData['user_id'])) {
-                // Restore session dari cookie
-                $_SESSION['user_id'] = $user['user_id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['name'] = $user['name'];
-    
-                return true; // Pengguna berhasil login dari cookie
+            try {
+                $encryptedData = $_COOKIE['persistent_session'];
+                // Penting: Tangani potensi error saat decoding
+                $decodedData = base64_decode($encryptedData, true); 
+                if ($decodedData === false) {
+                     // Tangani error base64 decode, mungkin hapus cookie
+                     setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                     return false;
+                }
+
+                $sessionData = json_decode($decodedData, true);
+                // Periksa error JSON decode
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                     // Tangani error JSON decode, mungkin hapus cookie
+                     setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                     return false;
+                }
+
+                // Periksa apakah data yang diperlukan ada setelah decoding berhasil
+                if ($sessionData && isset($sessionData['user_id'])) {
+                    
+                    // --- PERBAIKAN ---
+                    // Gunakan data dari $sessionData, bukan $user
+                    $_SESSION['user_id'] = $sessionData['user_id']; 
+
+                    // Pastikan data ini ADA di dalam cookie Anda saat login
+                    // (Fungsi loginUser Anda sudah menyimpannya)
+                    if (isset($sessionData['username'])) {
+                        $_SESSION['username'] = $sessionData['username'];
+                    }
+                    if (isset($sessionData['role'])) {
+                        $_SESSION['role'] = $sessionData['role'];
+                    }
+                     if (isset($sessionData['name'])) {
+                        $_SESSION['name'] = $sessionData['name'];
+                    }
+                    // --- AKHIR PERBAIKAN ---
+
+                    // Penting: Regenerate session ID setelah login (dari cookie atau form)
+                    // untuk mencegah session fixation attacks
+                    session_regenerate_id(true); 
+
+                    return true; // Pengguna berhasil login dari cookie
+                } else {
+                    // Data cookie tidak valid atau tidak lengkap
+                    setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                }
+            } catch (Exception $e) {
+                // Log error jika terjadi exception saat proses cookie
+                error_log("Error processing persistent session cookie: " . $e->getMessage());
+                setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie bermasalah
             }
         }
-    
-        return false; // Tidak ada sesi aktif
+
+        return false; // Tidak ada sesi aktif atau cookie valid
     }
     
     public function logoutUser()
