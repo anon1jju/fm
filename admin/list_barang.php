@@ -7,9 +7,8 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
     exit();
 }
 
-
 try {
-    // Inisialisasi array kosong untuk mencegah error
+    // Inisialisasi array kosong untuk mencegah error jika terjadi kegagalan query
     $dataProduk = $suppliers = $categories = $units = [];
 
     // Ambil koneksi PDO
@@ -18,16 +17,11 @@ try {
         throw new Exception("Koneksi database tidak tersedia.");
     }
 
-    // Ambil current page dari URL
-    $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    // Ambil data produk
+    $dataProduk = $farma->getAllProducts(); // Asumsi ada fungsi getAllProducts()
+
     
-    // Ambil data produk dengan pagination
-    $result = $farma->getProductsPaginated($currentPage, 15);
-    $dataProduk = $result['data'];
-    $totalItems = $result['total'];
-    $totalPages = $result['totalPages'];
-    
-    // Ambil data supplier
+    // Ambil data kategori produk
     $query = "SELECT supplier_id, supplier_name FROM suppliers";
     $stmt = $pdo->prepare($query);
     $stmt->execute();
@@ -56,23 +50,23 @@ try {
 <html lang="en" dir="ltr" data-nav-layout="vertical" class="light" data-header-styles="light" data-menu-styles="light" data-width="fullwidth" data-toggled="close">
 
 <head>
-    <?php include 'includes/meta.php'; ?>
+    <?php include "includes/meta.php";?>
 </head>
 
 <body>
-    <?php include 'includes/switch.php'; ?>
+    <?php include "includes/switch.php";?>
+    <!-- ========== END Switcher  ========== -->
     <!-- Loader -->
     <div id="loader">
         <img src="../assets/images/media/loader.svg" alt="">
     </div>
     <!-- Loader -->
     <div class="page">
-        <!-- app-header -->
-        <?php include 'includes/header.php'; ?>
+        <?php include "includes/header.php";?>
         <!-- /app-header -->
         
         <!-- Start::app-sidebar -->
-        <?php include 'includes/sidebar.php'; ?>
+        <?php include "includes/sidebar.php";?>
         <!-- End::app-sidebar -->
         
         <!-- Start::app-content -->
@@ -85,14 +79,25 @@ try {
                             <div class="box-header justify-between">
                                 <div class="box-title"><i class="ri-box-3-fill text-2xl"></i> Daftar Barang </div>
                                 <div class="flex gap-2">
-                                    <div class="input-wrapper" style="position: relative; display: inline-block;">
-                                      <input class="ti-form-control pe-10"  type="text" placeholder="Text atau Scan" id="search-barang" onkeyup="searchBarang()" style="padding-right: 2.5rem;">
-                                    
-                                      <i class="ri-close-line text-lg" 
-                                         onclick="document.getElementById('search-barang').value=''; searchBarang();" 
-                                         style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;"></i>
-                                    </div>
+                                    <input class="ti-form-control" type="text" placeholder="Text atau Scan" id="search-barang" onkeyup="searchBarang()">
+                                    <script>
+                                        function searchBarang() {
+                                            const input = document.getElementById('search-barang').value.toLowerCase();
+                                            const rows = document.querySelectorAll('.product-list');
 
+                                            rows.forEach(row => {
+                                                const productName = row.querySelector('td:first-child a').textContent.toLowerCase();
+                                                const barcode = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                                                const category = row.querySelector('td:nth-child(3)').textContent.toLowerCase();
+
+                                                if (productName.includes(input) || barcode.includes(input) || category.includes(input)) {
+                                                    row.style.display = '';
+                                                } else {
+                                                    row.style.display = 'none';
+                                                }
+                                            });
+                                        }
+                                    </script>
                                     <button type="button" class="ti-btn ti-btn-sm !m-0 ti-btn-primary text-nowrap" data-hs-overlay="#modal-tambah-barang">
                                         <i class="ri-add-line me-1 align-middle text-sm font-semibold"></i>Tambah Produk </button>
                                     <div class="hs-overlay hidden ti-modal" id="modal-tambah-barang">
@@ -224,94 +229,67 @@ try {
                             </div>
                             <div class="box-body">
                                 <div class="table-responsive">
-                                    <table class="table border border-defaultborder dark:border-defaultborder/10 text-nowrap">
-                                        <thead>
-                                            <tr class="border-b border-defaultborder dark:border-defaultborder/10">
-                                                <th scope="col">Produk</th>
-                                                <th scope="col">Barcode</th>
-                                                <th scope="col">Kategori</th>
-                                                <th scope="col">Modal</th>
-                                                <th scope="col">Jual</th>
-                                                <th scope="col">Exp</th>
-                                                <th scope="col">Unit</th>
-                                                <th scope="col">Stok</th>
-                                                <th scope="col">Supplier</th>
-                                                <th scope="col">Aksi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php if (!empty($dataProduk)): ?>
-                                                <?php foreach ($dataProduk as $produk): ?>
-                                                    <?php
-                                                    $modal = "Rp " . number_format($produk['cost_price'], 2, ',', '.');
-                                                    $jual = "Rp " . number_format($produk['price'], 2, ',', '.');
+                                    <div class="table-responsive" data-bs-spy="scroll" data-bs-target="#scrollspyTable" data-bs-offset="0" tabindex="0">
+                                        <table class="table border border-defaultborder dark:border-defaultborder/10 text-nowrap" id="scrollspyTable">
+                                            <thead>
+                                                <tr class="border-b border-defaultborder dark:border-defaultborder/10">
+                                                    <th scope="col">Produk</th>
+                                                    <th scope="col">Barcode</th>
+                                                    <th scope="col">Kategori</th>
+                                                    <th scope="col">Modal</th>
+                                                    <th scope="col">Jual</th>
+                                                    <th scope="col">Exp</th>
+                                                    <th scope="col">Unit</th>
+                                                    <th scope="col">Stok</th>
+                                                    <th scope="col">Supplier</th>
+                                                    <th scope="col">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            <?php if (!empty($dataProduk)): ?> 
+                                                <?php foreach ($dataProduk as $produk): ?> 
+                                                <?php 
+                                                    $modal = "Rp ".number_format($produk['cost_price'], 2, ',', '.');
+                                                    $jual = "Rp ".number_format($produk['price'], 2, ',', '.');
                                                     $expire_produk = json_decode($farma->daysUntilExpire($produk['expiry_date']), true);
                                                     $days_left = $expire_produk['days_left'];
-                                                    
-                                                    // Tentukan kelas badge untuk expire
-                                                    if ($days_left <= 60) {
-                                                        $badge_class = 'bg-danger/10 text-danger';
-                                                    } elseif ($days_left <= 90) {
-                                                        $badge_class = 'bg-warning/10 text-warning';
-                                                    } else {
-                                                        $badge_class = 'bg-success/10 text-success';
-                                                    }
-                                                    
-                                                    // Tentukan badge untuk stok
-                                                    if ($produk['stock_quantity'] <= 0) {
-                                                        $stoksisa = '<span class="badge !rounded-full bg-outline-danger">Habis</span>';
-                                                    } elseif ($produk['stock_quantity'] <= $produk['minimum_stock'] * 2) {
-                                                        $stoksisa = '<span class="badge !rounded-full bg-outline-warning">' . htmlspecialchars($produk['stock_quantity']) . '</span>';
-                                                    } else {
-                                                        $stoksisa = '<span class="badge !rounded-full bg-outline-success">' . htmlspecialchars($produk['stock_quantity']) . '</span>';
-                                                    }
-                                                    
-                                                    $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui';
-                                                    ?>
-                                                    <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
-                                                        <td>
-                                                            <div class="flex">
-                                                                <div class="ms-2">
-                                                                    <p class="font-semibold mb-0 flex items-center">
-                                                                        <a href="javascript:void(0);">
-                                                                            <?php echo htmlspecialchars($produk['product_name']); ?>
-                                                                        </a>
-                                                                    </p>
-                                                                    <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0">
-                                                                        <?php echo htmlspecialchars($produk['posisi']) . ' - ' . htmlspecialchars($produk['kode_item']); ?>
-                                                                    </p>
-                                                                </div>
+                                                    $badge_class = $days_left <= 60 ? 'bg-danger/10 text-danger' : ($days_left <= 90 ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success');
+                                                    $stoksisa = $produk['stock_quantity'] <= 0 ? '<span class="badge !rounded-full bg-outline-danger">Habis</span>' : 
+                                                                ($produk['stock_quantity'] <= $produk['minimum_stock'] * 2 ? '<span class="badge !rounded-full bg-outline-warning">' . htmlspecialchars($produk['stock_quantity']) . '</span>' : 
+                                                                '<span class="badge !rounded-full bg-outline-success">' . htmlspecialchars($produk['stock_quantity']) . '</span>');
+                                                    $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui'; 
+                                                ?> 
+                                                <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
+                                                    <td>
+                                                        <div class="flex">
+                                                            <div class="ms-2">
+                                                                <p class="font-semibold mb-0 flex items-center"><a href="javascript:void(0);"><?php echo htmlspecialchars($produk['product_name']); ?></a></p>
+                                                                <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0"><?php echo htmlspecialchars($produk['posisi']). ' - '.htmlspecialchars($produk['kode_item']). ' - '.htmlspecialchars($produk['batch_number']); ?></p>
                                                             </div>
-                                                        </td>
-                                                        <td><?php echo htmlspecialchars($produk['barcode']); ?></td>
-                                                        <td><?php echo htmlspecialchars($produk['category_name']); ?></td>
-                                                        <td><?php echo htmlspecialchars($modal); ?></td>
-                                                        <td><?php echo htmlspecialchars($jual); ?></td>
-                                                        <td>
-                                                            <span class="badge <?php echo $badge_class; ?>">
-                                                                <?php echo htmlspecialchars($days_left . ' hari'); ?>
-                                                            </span>
-                                                        </td>
-                                                        <td><?php echo htmlspecialchars($produk['unit']); ?></td>
-                                                        <td><?php echo $stoksisa; ?></td>
-                                                        <td><?php echo $supplier_name; ?></td>
-                                                        <td>
-                                                            <div class="hstack gap-2 text-[15px]">
-                                                                <!-- Tombol Edit -->
-                                                                <a href="javascript:void(0);" 
-                                                                   class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-primary" 
-                                                                   data-hs-overlay="#modal-edit-barang-<?php echo $produk['product_id']; ?>">
-                                                                    <i class="ri-edit-line"></i>
-                                                                </a>
-                                                                <!-- Tombol Hapus -->
-                                                                <a href="javascript:void(0);" 
-                                                                   class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" 
-                                                                   onclick="confirmDelete(<?php echo $produk['product_id']; ?>, '<?php echo addslashes($produk['product_name']); ?>')">
-                                                                    <i class="ri-delete-bin-line"></i>
-                                                                </a>
-                                                            </div>
-                                                        </td>
-                                                
+                                                        </div>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($produk['barcode']); ?></td>
+                                                    <td><?php echo htmlspecialchars($produk['category_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($modal); ?></td>
+                                                    <td><?php echo htmlspecialchars($jual); ?></td>
+                                                    <td>
+                                                        <span class="badge <?php echo $badge_class; ?>"> <?php echo htmlspecialchars($days_left . ' hari'); ?> </span>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($produk['unit']); ?></td>
+                                                    <td><?php echo $stoksisa; ?></td>
+                                                    <td><?php echo $supplier_name; ?></td>
+                                                    <td>
+                                                        <div class="hstack gap-2 text-[15px]">
+                                                            <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-primary" data-hs-overlay="#modal-edit-barang-<?php echo $produk['product_id']; ?>">
+                                                                <i class="ri-edit-line"></i>
+                                                            </a>
+                                                            <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" onclick="confirmDelete(<?php echo $produk['product_id']; ?>, '<?php echo htmlspecialchars($produk['product_name'], ENT_QUOTES, 'UTF-8'); ?>')">
+                                                                <i class="ri-delete-bin-line"></i>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
                                                 <!-- Modal Edit -->
                                                 <div class="hs-overlay hidden ti-modal" id="modal-edit-barang-<?php echo $produk['product_id']; ?>">
                                                     <div class="hs-overlay-open:mt-7 ti-modal-box mt-0 ease-out lg:!max-w-4xl lg:w-full m-3 lg:mx-auto flex items-center min-h-[calc(100%-3.5rem)] justify-center">
@@ -449,44 +427,6 @@ try {
                                     </table>
                                 </div>
                             </div>
-                            <!-- Pagination -->
-                        <div class="box-footer">
-                            <div class="flex items-center flex-wrap justify-between">
-                                <div>
-                                    Showing <?php echo (($currentPage - 1) * 15) + 1; ?> 
-                                    to <?php echo min($currentPage * 15, $totalItems); ?> 
-                                    of <?php echo $totalItems; ?> entries
-                                </div>
-                                <nav aria-label="Page navigation">
-                                    <ul class="ti-pagination">
-                                        <?php if ($currentPage > 1): ?>
-                                            <li class="page-item">
-                                                <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $currentPage - 1 ?>">Previous</a>
-                                            </li>
-                                        <?php endif; ?>
-                                        
-                                        <?php
-                                        // Tampilkan maksimal 5 nomor halaman
-                                        $startPage = max(1, min($currentPage - 2, $totalPages - 4));
-                                        $endPage = min($totalPages, max(5, $currentPage + 2));
-                                        
-                                        for ($i = $startPage; $i <= $endPage; $i++): ?>
-                                            <li class="page-item">
-                                                <a class="page-link px-3 py-[0.375rem] <?= (int)$i === (int)$currentPage ? 'bg-primary text-white hover:text-white' : '' ?>" 
-                                                   href="?page=<?= $i ?>">
-                                                    <?= $i ?>
-                                                </a>
-                                            </li>
-                                        <?php endfor; ?>
-                                        
-                                        <?php if ($currentPage < $totalPages): ?>
-                                            <li class="page-item">
-                                                <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $currentPage + 1 ?>">Next</a>
-                                            </li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </nav>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -494,8 +434,8 @@ try {
             </div>
         </div>
         <!-- End::app-content -->
-        <?php include 'includes/footer.php'; ?>
-
+        <?php include "includes/footer.php";?>
+        
     </div>
     <!-- Scroll To Top -->
     <div class="scrollToTop">
@@ -535,7 +475,6 @@ try {
     
     <script src="../assets/js/autoformatexpire.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <script>
         function confirmDelete(productId, productName) {
             Swal.fire({
