@@ -8,7 +8,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
 }
 
 try {
-    // Inisialisasi array kosong untuk mencegah error jika terjadi kegagalan query
+    // Inisialisasi array kosong untuk mencegah error
     $dataProduk = $suppliers = $categories = $units = [];
 
     // Ambil koneksi PDO
@@ -17,10 +17,16 @@ try {
         throw new Exception("Koneksi database tidak tersedia.");
     }
 
-    // Ambil data produk
-    $dataProduk = $farma->getAllProducts(); // Asumsi ada fungsi getAllProducts()
+    // Ambil current page dari URL
+    $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
     
-    // Ambil data kategori produk
+    // Ambil data produk dengan pagination
+    $result = $farma->getProductsPaginated($currentPage, 15);
+    $dataProduk = $result['data'];
+    $totalItems = $result['total'];
+    $totalPages = $result['totalPages'];
+    
+    // Ambil data supplier
     $query = "SELECT supplier_id, supplier_name FROM suppliers";
     $stmt = $pdo->prepare($query);
     $stmt->execute();
@@ -453,51 +459,43 @@ try {
                                     </table>
                                 </div>
                             </div>
-                            <?php
-                            // Pagination logic
-                            $itemsPerPage = 15;
-                            $totalItems = count($dataProduk);
-                            $totalPages = ceil($totalItems / $itemsPerPage);
-                            $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-                            $currentPage = max(1, min($currentPage, $totalPages));
-                            $startIndex = ($currentPage - 1) * $itemsPerPage;
-                            $paginatedData = array_slice($dataProduk, $startIndex, $itemsPerPage);
-                            ?>
-
-                            <div class="box-footer">
-                                <div class="flex items-center flex-wrap overflow-auto">
-                                    <div class="ms-auto">
-                                        <nav aria-label="..." class="me-4 sm:mb-0 mb-2">
-                                            <ul class="ti-pagination">
-                                                <?php if ($currentPage > 1): ?>
-                                                    <li class="page-item">
-                                                        <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $currentPage - 1 ?>">Previous</a>
-                                                    </li>
-                                                <?php else: ?>
-                                                    <li class="page-item disabled">
-                                                        <a class="page-link px-3 py-[0.375rem]">Previous</a>
-                                                    </li>
-                                                <?php endif; ?>
-
-                                                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                                                    <li class="page-item <?= $i === $currentPage ? 'active' : '' ?>">
-                                                        <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $i ?>"><?= $i ?></a>
-                                                    </li>
-                                                <?php endfor; ?>
-
-                                                <?php if ($currentPage < $totalPages): ?>
-                                                    <li class="page-item">
-                                                        <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $currentPage + 1 ?>">Next</a>
-                                                    </li>
-                                                <?php else: ?>
-                                                    <li class="page-item disabled">
-                                                        <a class="page-link px-3 py-[0.375rem]">Next</a>
-                                                    </li>
-                                                <?php endif; ?>
-                                            </ul>
-                                        </nav>
-                                    </div>
+                            <!-- Pagination -->
+                        <div class="box-footer">
+                            <div class="flex items-center flex-wrap justify-between">
+                                <div>
+                                    Showing <?php echo (($currentPage - 1) * 15) + 1; ?> 
+                                    to <?php echo min($currentPage * 15, $totalItems); ?> 
+                                    of <?php echo $totalItems; ?> entries
                                 </div>
+                                <nav aria-label="Page navigation">
+                                    <ul class="ti-pagination">
+                                        <?php if ($currentPage > 1): ?>
+                                            <li class="page-item">
+                                                <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $currentPage - 1 ?>">Previous</a>
+                                            </li>
+                                        <?php endif; ?>
+                                        
+                                        <?php
+                                        // Tampilkan maksimal 5 nomor halaman
+                                        $startPage = max(1, min($currentPage - 2, $totalPages - 4));
+                                        $endPage = min($totalPages, max(5, $currentPage + 2));
+                                        
+                                        for ($i = $startPage; $i <= $endPage; $i++): ?>
+                                            <li class="page-item">
+                                                <a class="page-link px-3 py-[0.375rem] <?= $i === $currentPage ? 'bg-primary text-white hover:text-white' : '' ?>" 
+                                                   href="?page=<?= $i ?>">
+                                                    <?= $i ?>
+                                                </a>
+                                            </li>
+                                        <?php endfor; ?>
+                                        
+                                        <?php if ($currentPage < $totalPages): ?>
+                                            <li class="page-item">
+                                                <a class="page-link px-3 py-[0.375rem]" href="?page=<?= $currentPage + 1 ?>">Next</a>
+                                            </li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </nav>
                             </div>
                         </div>
                     </div>
@@ -507,22 +505,7 @@ try {
         </div>
         <!-- End::app-content -->
         <?php include 'includes/footer.php'; ?>
-        
-        
-        <div class="hs-overlay ti-modal hidden" id="header-responsive-search" tabindex="-1" aria-labelledby="header-responsive-search" aria-hidden="true">
-            <div class="ti-modal-box">
-                <div class="ti-modal-dialog">
-                    <div class="ti-modal-content">
-                        <div class="ti-modal-body">
-                            <div class="input-group">
-                                <input type="text" class="form-control border-end-0 !border-s" placeholder="Search Anything ..." aria-label="Search Anything ..." aria-describedby="button-addon2">
-                                <button class="ti-btn ti-btn-primary !m-0" type="button" id="button-addon2"><i class="bi bi-search"></i></button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
     </div>
     <!-- Scroll To Top -->
     <div class="scrollToTop">
