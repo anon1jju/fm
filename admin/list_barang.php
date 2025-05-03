@@ -20,13 +20,22 @@ try {
     // Ambil data produk
     $dataProduk = $farma->getAllProducts(); // Asumsi ada fungsi getAllProducts()
 
-    // Ambil data supplier berdasarkan product_id jika diperlukan
+    /*// Ambil data supplier berdasarkan product_id jika diperlukan
     $productId = $_GET['product_id'] ?? null; // Ambil product_id dari parameter URL (jika ada)
     if ($productId) {
         $suppliers = $farma->getSuppliersByProductId($productId); // Fungsi getSuppliersByProductId() digunakan di sini
     } else {
         $suppliers = $farma->getSuppliers(); // Jika tidak ada product_id, ambil semua supplier
-    }
+    }*/
+    
+    
+    //$suppliers = $farma->getSuppliers();
+    
+    // Ambil data kategori produk
+    $query = "SELECT supplier_id, supplier_name FROM suppliers";
+    $stmt = $pdo->prepare($query);
+    $stmt->execute();
+    $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Ambil data kategori produk
     $query = "SELECT category_id, category_name FROM product_categories";
@@ -1041,7 +1050,7 @@ try {
                                     <a href="javascript:void(0)">Supplier</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="supplier.php" class="side-menu__item">Daftar Supplier</a>
+                                    <a href="suppliers.php" class="side-menu__item">Daftar Supplier</a>
                                 </li>
                                 <li class="slide">
                                     <a href="pembelian_supplier.php" class="side-menu__item">Pembelian per Supplier</a>
@@ -1294,8 +1303,8 @@ try {
                                                     $stoksisa = '<span class="badge !rounded-full bg-outline-success">' . htmlspecialchars($produk['stock_quantity']) . '</span>';
                                                 }
                                                 // Supplier
-                                                    $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui';
-                                            ?> <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
+                                                    $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui';?> 
+                                                <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
                                                 <td>
                                                     <div class="flex">
                                                         <div class="ms-2">
@@ -1433,17 +1442,18 @@ try {
                                                                         </div>
                                                 
                                                                         <!-- Supplier -->
-                                                                            <div class="xl:col-span-6 col-span-12">
-    <label class="ti-form-label">Supplier</label>
-    <select class="ti-form-control" name="supplier_id">
-        <?php foreach ($suppliers as $supplier): ?>
-            <option value="<?php echo htmlspecialchars($supplier['supplier_id'], ENT_QUOTES, 'UTF-8'); ?>" 
-                <?php echo ($produk['supplier_id'] == $supplier['supplier_id']) ? 'selected' : ''; ?>>
-                <?php echo htmlspecialchars($supplier['supplier_name'], ENT_QUOTES, 'UTF-8'); ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-</div>
+                                                                        <div class="xl:col-span-6 col-span-12">
+                                                                            <label class="ti-form-label">Supplier</label>
+                                                                            <select class="ti-form-control" name="supplier_id">
+                                                                                <option value="" disabled>Pilih Supplier</option>
+                                                                                <?php foreach ($suppliers as $supplier): ?>
+                                                                                    <option value="<?= htmlspecialchars($supplier['supplier_id'], ENT_QUOTES, 'UTF-8') ?>" 
+                                                                                        <?= $produk['supplier_id'] == $supplier['supplier_id'] ? 'selected' : '' ?>>
+                                                                                        <?= htmlspecialchars($supplier['supplier_name'], ENT_QUOTES, 'UTF-8') ?>
+                                                                                    </option>
+                                                                                <?php endforeach; ?>
+                                                                            </select>
+                                                                        </div>
                                                                         </div>
                                                                     <div class="ti-modal-footer">
                                                                         <button type="button" class="hs-dropdown-toggle ti-btn btn-wave ti-btn-light align-middle" data-hs-overlay="#modal-edit-barang-<?php echo $produk['product_id']; ?>">Tutup</button>
@@ -1467,7 +1477,7 @@ try {
                             </div>
                             <?php
                             // Pagination logic
-                            $itemsPerPage = 20;
+                            $itemsPerPage = 15;
                             $totalItems = count($dataProduk);
                             $totalPages = ceil($totalItems / $itemsPerPage);
                             $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
