@@ -229,67 +229,88 @@ try {
                             </div>
                             <div class="box-body">
                                 <div class="table-responsive">
-                                    <div class="table-responsive" data-bs-spy="scroll" data-bs-target="#scrollspyTable" data-bs-offset="0" tabindex="0">
-                                        <table class="table border border-defaultborder dark:border-defaultborder/10 text-nowrap" id="scrollspyTable">
-                                            <thead>
-                                                <tr class="border-b border-defaultborder dark:border-defaultborder/10">
-                                                    <th scope="col">Produk</th>
-                                                    <th scope="col">Barcode</th>
-                                                    <th scope="col">Kategori</th>
-                                                    <th scope="col">Modal</th>
-                                                    <th scope="col">Jual</th>
-                                                    <th scope="col">Exp</th>
-                                                    <th scope="col">Unit</th>
-                                                    <th scope="col">Stok</th>
-                                                    <th scope="col">Supplier</th>
-                                                    <th scope="col">Aksi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                            <?php if (!empty($dataProduk)): ?> 
-                                                <?php foreach ($dataProduk as $produk): ?> 
-                                                <?php 
-                                                    $modal = "Rp ".number_format($produk['cost_price'], 2, ',', '.');
-                                                    $jual = "Rp ".number_format($produk['price'], 2, ',', '.');
-                                                    $expire_produk = json_decode($farma->daysUntilExpire($produk['expiry_date']), true);
-                                                    $days_left = $expire_produk['days_left'];
-                                                    $badge_class = $days_left <= 60 ? 'bg-danger/10 text-danger' : ($days_left <= 90 ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success');
-                                                    $stoksisa = $produk['stock_quantity'] <= 0 ? '<span class="badge !rounded-full bg-outline-danger">Habis</span>' : 
-                                                                ($produk['stock_quantity'] <= $produk['minimum_stock'] * 2 ? '<span class="badge !rounded-full bg-outline-warning">' . htmlspecialchars($produk['stock_quantity']) . '</span>' : 
-                                                                '<span class="badge !rounded-full bg-outline-success">' . htmlspecialchars($produk['stock_quantity']) . '</span>');
-                                                    $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui'; 
-                                                ?> 
-                                                <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
-                                                    <td>
-                                                        <div class="flex">
-                                                            <div class="ms-2">
-                                                                <p class="font-semibold mb-0 flex items-center"><a href="javascript:void(0);"><?php echo htmlspecialchars($produk['product_name']); ?></a></p>
-                                                                <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0"><?php echo htmlspecialchars($produk['posisi']). ' - '.htmlspecialchars($produk['kode_item']). ' - '.htmlspecialchars($produk['batch_number']); ?></p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td><?php echo htmlspecialchars($produk['barcode']); ?></td>
-                                                    <td><?php echo htmlspecialchars($produk['category_name']); ?></td>
-                                                    <td><?php echo htmlspecialchars($modal); ?></td>
-                                                    <td><?php echo htmlspecialchars($jual); ?></td>
-                                                    <td>
-                                                        <span class="badge <?php echo $badge_class; ?>"> <?php echo htmlspecialchars($days_left . ' hari'); ?> </span>
-                                                    </td>
-                                                    <td><?php echo htmlspecialchars($produk['unit']); ?></td>
-                                                    <td><?php echo $stoksisa; ?></td>
-                                                    <td><?php echo $supplier_name; ?></td>
-                                                    <td>
-                                                        <div class="hstack gap-2 text-[15px]">
-                                                            <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-primary" data-hs-overlay="#modal-edit-barang-<?php echo $produk['product_id']; ?>">
-                                                                <i class="ri-edit-line"></i>
-                                                            </a>
-                                                            <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" onclick="confirmDelete(<?php echo $produk['product_id']; ?>, '<?php echo htmlspecialchars($produk['product_name'], ENT_QUOTES, 'UTF-8'); ?>')">
-                                                                <i class="ri-delete-bin-line"></i>
-                                                            </a>
-                                                        </div>
-                                                    </td>
-                                                </tr>
+                                    <table class="table border border-defaultborder dark:border-defaultborder/10 text-nowrap">
+                                        <thead>
+                                            <tr class="border-b border-defaultborder dark:border-defaultborder/10">
+                                                <th scope="col">Produk</th>
+                                                <th scope="col">Barcode</th>
+                                                <th scope="col">Kategori</th>
+                                                <th scope="col">Modal</th>
+                                                <th scope="col">Jual</th>
+                                                <th scope="col">Exp</th>
+                                                <th scope="col">Unit</th>
+                                                <th scope="col">Stok</th>
+                                                <th scope="col">Supplier</th>
+                                                <th scope="col">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody> 
+                                        <?php if (!empty($dataProduk)): ?> 
+                                            <?php foreach ($dataProduk as $produk): ?> 
+                                            <?php 
+                                                $modal = "Rp ".number_format($produk['cost_price'], 2, ',', '.');
+                                                $jual = "Rp ".number_format($produk['price'], 2, ',', '.');
+                                                $expire_produk = json_decode($farma->daysUntilExpire($produk['expiry_date']), true);
+                                                // Ambil jumlah hari yang tersisa
+                                                $days_left = $expire_produk['days_left'];
+                                                
+                                                // Tentukan kelas badge berdasarkan jumlah hari yang tersisa
+                                                if ($days_left <= 60) { // 60 hari kira-kira 2 bulan
+                                                    $badge_class = 'bg-danger/10 text-danger'; // Merah jika sisa 2 bulan atau kurang
+                                                } elseif ($days_left <= 90) { // 90 hari kira-kira 3 bulan
+                                                    $badge_class = 'bg-warning/10 text-warning'; 
+                                                } else {
+                                                    $badge_class = 'bg-success/10 text-success'; // Hijau jika lebih dari 3 bulan
+                                                }
+                                                
+                                                $stoksisa = '';
 
+                                                if ($produk['stock_quantity'] <= 0) {
+                                                    // Stok habis
+                                                    $stoksisa = '<span class="badge !rounded-full bg-outline-danger">Habis</span>';
+                                                } elseif ($produk['stock_quantity'] <= $produk['minimum_stock'] * 2) {
+                                                    // Stok mendekati minimum
+                                                    $stoksisa = '<span class="badge !rounded-full bg-outline-warning">' . htmlspecialchars($produk['stock_quantity']) . '</span>';
+                                                } else {
+                                                    // Stok aman
+                                                    $stoksisa = '<span class="badge !rounded-full bg-outline-success">' . htmlspecialchars($produk['stock_quantity']) . '</span>';
+                                                }
+                                                // Supplier
+                                                    $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui';?> 
+                                                <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
+                                                <td>
+                                                    <div class="flex">
+                                                        <div class="ms-2">
+                                                            <p class="font-semibold mb-0 flex items-center"><a href="javascript:void(0);"><?php echo htmlspecialchars($produk['product_name']); ?></a></p>
+                                                            <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0"><?php echo htmlspecialchars($produk['posisi']). ' - '.htmlspecialchars($produk['kode_item']). ' - '.htmlspecialchars($produk['batch_number']); ?></p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($produk['barcode']); ?></td>
+                                                <td><?php echo htmlspecialchars($produk['category_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($modal); ?></td>
+                                                <td><?php echo htmlspecialchars($jual); ?></td>
+                                                <td>
+                                                    <span class="badge <?php echo $badge_class; ?>"> <?php echo htmlspecialchars($days_left . ' hari'); ?> </span>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($produk['unit']); ?></td>
+                                                <td><?php echo $stoksisa; ?></td>
+                                                <td><?php echo $supplier_name; ?></td>
+                                                
+                                                <td>
+                                                    <div class="hstack gap-2 text-[15px]">
+                                                        <!-- Tombol Edit -->
+                                                        <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-primary" data-hs-overlay="#modal-edit-barang-<?php echo $produk['product_id']; ?>">
+                                                            <i class="ri-edit-line"></i>
+                                                        </a>
+                                                        
+                                                        <!-- Tombol Hapus -->
+                                                        <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" onclick="confirmDelete(<?php echo $produk['product_id']; ?>, '<?php echo htmlspecialchars($produk['product_name'], ENT_QUOTES, 'UTF-8'); ?>')">
+                                                            <i class="ri-delete-bin-line"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                                
                                                 <!-- Modal Edit -->
                                                 <div class="hs-overlay hidden ti-modal" id="modal-edit-barang-<?php echo $produk['product_id']; ?>">
                                                     <div class="hs-overlay-open:mt-7 ti-modal-box mt-0 ease-out lg:!max-w-4xl lg:w-full m-3 lg:mx-auto flex items-center min-h-[calc(100%-3.5rem)] justify-center">
