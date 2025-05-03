@@ -7,6 +7,21 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
     exit();
 }
 
+// Ambil parameter search
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+
+// Modifikasi query sesuai dengan ada tidaknya parameter search
+if (!empty($search)) {
+    $dataProduk = $farma->searchProducts($search);
+} else {
+    // Ambil data dengan pagination seperti biasa
+    $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $result = $farma->getProductsPaginated($currentPage, 15);
+    $dataProduk = $result['data'];
+    $totalItems = $result['total'];
+    $totalPages = $result['totalPages'];
+}
+
 try {
     // Inisialisasi array kosong untuk mencegah error
     $dataProduk = $suppliers = $categories = $units = [];
@@ -85,19 +100,13 @@ try {
                                 <div class="box-title"><i class="ri-box-3-fill text-2xl"></i> Daftar Barang </div>
                                 <div class="flex gap-2">
                                     <div class="input-wrapper" style="position: relative; display: inline-block;">
-                                      <input class="ti-form-control pe-10" 
-                                             type="text" 
-                                             placeholder="Text atau Scan" 
-                                             id="search-barang" 
-                                             onkeyup="searchBarang()" 
-                                             style="padding-right: 2.5rem;">
+                                      <input class="ti-form-control pe-10"  type="text" placeholder="Text atau Scan" id="search-barang" onkeyup="searchBarang()" style="padding-right: 2.5rem;">
                                     
                                       <i class="ri-close-line text-lg" 
                                          onclick="document.getElementById('search-barang').value=''; searchBarang();" 
                                          style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999;"></i>
                                     </div>
-                                    
-                                    
+
                                     <button type="button" class="ti-btn ti-btn-sm !m-0 ti-btn-primary text-nowrap" data-hs-overlay="#modal-tambah-barang">
                                         <i class="ri-add-line me-1 align-middle text-sm font-semibold"></i>Tambah Produk </button>
                                     <div class="hs-overlay hidden ti-modal" id="modal-tambah-barang">
@@ -477,7 +486,7 @@ try {
                                         
                                         for ($i = $startPage; $i <= $endPage; $i++): ?>
                                             <li class="page-item">
-                                                <a class="page-link px-3 py-[0.375rem] <?= $i === $currentPage ? 'bg-primary text-white hover:text-white' : '' ?>" 
+                                                <a class="page-link px-3 py-[0.375rem] <?= (int)$i === (int)$currentPage ? 'bg-primary text-white hover:text-white' : '' ?>" 
                                                    href="?page=<?= $i ?>">
                                                     <?= $i ?>
                                                 </a>
@@ -540,114 +549,6 @@ try {
     
     <script src="../assets/js/autoformatexpire.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        let searchTimeout;
-    
-        function searchBarang() {
-            clearTimeout(searchTimeout);
-            const input = document.getElementById("search-barang").value;
-            const tbody = document.querySelector("tbody");
-            const paginationContainer = document.querySelector(".box-footer");
-    
-            // Jika input kosong, reload halaman untuk menampilkan pagination normal
-            if (input.trim() === "") {
-                window.location.href = "list_barang.php";
-                return;
-            }
-    
-            // Tunggu 500ms setelah user selesai mengetik
-            searchTimeout = setTimeout(() => {
-                fetch(`search_products.php?keyword=${encodeURIComponent(input)}`)
-                    .then((response) => response.json())
-                    .then((result) => {
-                        if (result.error) {
-                            console.error(result.error);
-                            return;
-                        }
-    
-                        // Kosongkan tbody
-                        tbody.innerHTML = "";
-    
-                        if (result.data.length === 0) {
-                            tbody.innerHTML = `
-                                                                    <tr>
-                                                                        <td colspan="11" class="text-center">Tidak ada data yang ditemukan</td>
-                                                                    </tr>
-                                                                `;
-                            // Sembunyikan pagination saat pencarian
-                            paginationContainer.style.display = "none";
-                            return;
-                        }
-    
-                        // Render hasil pencarian
-                        result.data.forEach((produk) => {
-                            const modal = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(produk.cost_price);
-                            const jual = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(produk.price);
-    
-                            // Tentukan badge untuk stok
-                            let stoksisa = "";
-                            if (produk.stock_quantity <= 0) {
-                                stoksisa = '<span class="badge !rounded-full bg-outline-danger">Habis</span>';
-                            } else if (produk.stock_quantity <= produk.minimum_stock * 2) {
-                                stoksisa = `<span class="badge !rounded-full bg-outline-warning">${produk.stock_quantity}</span>`;
-                            } else {
-                                stoksisa = `<span class="badge !rounded-full bg-outline-success">${produk.stock_quantity}</span>`;
-                            }
-    
-                            tbody.innerHTML += `
-                                                                    <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
-                                                                        <td>
-                                                                            <div class="flex">
-                                                                                <div class="ms-2">
-                                                                                    <p class="font-semibold mb-0 flex items-center">
-                                                                                        <a href="javascript:void(0);">${produk.product_name}</a>
-                                                                                    </p>
-                                                                                    <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0">
-                                                                                        ${produk.posisi} - ${produk.kode_item}
-                                                                                    </p>
-                                                                                </div>
-                                                                            </div>
-                                                                        </td>
-                                                                        <td>${produk.barcode}</td>
-                                                                        <td>${produk.category_name}</td>
-                                                                        <td>${modal}</td>
-                                                                        <td>${jual}</td>
-                                                                        <td>${produk.expiry_date ? produk.expiry_date : "-"}</td>
-                                                                        <td>${produk.unit}</td>
-                                                                        <td>${stoksisa}</td>
-                                                                        <td>${produk.supplier_name || "Tidak Diketahui"}</td>
-                                                                        <td>
-                                                                            <div class="hstack gap-2 text-[15px]">
-                                                                                <a href="javascript:void(0);" 
-                                                                                   class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-primary" 
-                                                                                   data-hs-overlay="#modal-edit-barang-${produk.product_id}">
-                                                                                    <i class="ri-edit-line"></i>
-                                                                                </a>
-                                                                                <a href="javascript:void(0);" 
-                                                                                   class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" 
-                                                                                   onclick="confirmDelete(${produk.product_id}, '${produk.product_name.replace("'", "\\'")}')">
-                                                                                    <i class="ri-delete-bin-line"></i>
-                                                                                </a>
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                `;
-                        });
-    
-                        // Sembunyikan pagination saat pencarian
-                        paginationContainer.style.display = "none";
-                    })
-                    .catch((error) => {
-                        console.error("Error:", error);
-                        tbody.innerHTML = `
-                                                                <tr>
-                                                                    <td colspan="11" class="text-center">Terjadi kesalahan saat mencari data</td>
-                                                                </tr>
-                                                            `;
-                    });
-            }, 100);
-        }
-    </script>
 
     <script>
         function confirmDelete(productId, productName) {
