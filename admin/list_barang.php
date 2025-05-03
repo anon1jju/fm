@@ -7,20 +7,6 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
     exit();
 }
 
-// Ambil parameter search
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-
-// Modifikasi query sesuai dengan ada tidaknya parameter search
-if (!empty($search)) {
-    $dataProduk = $farma->searchProducts($search);
-} else {
-    // Ambil data dengan pagination seperti biasa
-    $currentPage = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-    $result = $farma->getProductsPaginated($currentPage, 15);
-    $dataProduk = $result['data'];
-    $totalItems = $result['total'];
-    $totalPages = $result['totalPages'];
-}
 
 try {
     // Inisialisasi array kosong untuk mencegah error
