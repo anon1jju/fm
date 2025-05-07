@@ -123,6 +123,156 @@ class Farmamedika
         }
     }
     
+    // Di dalam kelas Farmamedika
+
+/**
+ * Menambahkan catatan pembayaran untuk sebuah pembelian dan memperbarui status pembelian.
+ * @param int $purchase_id ID pembelian
+ * @param array $data Data pembayaran (payment_date, amount_paid, payment_method, reference, proof_document_path)
+ * @param int $userId ID user yang melakukan aksi (opsional, untuk logging)
+ * @return array Hasil operasi (success, message)
+ */
+public function addPurchasePayment($purchase_id, $data, $userId = null)
+{
+    if (!$this->pdo) {
+        error_log("addPurchasePayment Error: No valid PDO connection.");
+        return ['success' => false, 'message' => 'Koneksi database gagal.'];
+    }
+
+    // Validasi data input
+    if (empty($data['payment_date']) || !isset($data['amount_paid']) || !is_numeric($data['amount_paid']) || $data['amount_paid'] <= 0 || empty($data['payment_method'])) {
+        return ['success' => false, 'message' => 'Tanggal bayar, jumlah bayar (harus angka > 0), dan metode bayar wajib diisi.'];
+    }
+    // Sanitasi sederhana untuk path, idealnya ada validasi/pembersihan lebih lanjut
+    $proof_path = isset($data['proof_document_path']) ? filter_var(trim($data['proof_document_path']), FILTER_SANITIZE_STRING) : null;
+    $reference = isset($data['reference']) ? filter_var(trim($data['reference']), FILTER_SANITIZE_STRING) : null;
+
+
+    try {
+        $this->pdo->beginTransaction();
+
+        // 1. Insert ke tabel purchase_payments
+        $sql_insert_payment = "INSERT INTO purchase_payments (purchase_id, payment_date, amount_paid, proof_document_path, payment_method, reference, created_at, updated_at)
+                               VALUES (:purchase_id, :payment_date, :amount_paid, :proof_document_path, :payment_method, :reference, NOW(), NOW())";
+        $stmt_insert = $this->pdo->prepare($sql_insert_payment);
+        $stmt_insert->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_insert->bindParam(':payment_date', $data['payment_date']);
+        $stmt_insert->bindParam(':amount_paid', $data['amount_paid']);
+        $stmt_insert->bindParam(':proof_document_path', $proof_path);
+        $stmt_insert->bindParam(':payment_method', $data['payment_method']);
+        $stmt_insert->bindParam(':reference', $reference);
+        $stmt_insert->execute();
+
+        // 2. Dapatkan total tagihan pembelian
+        $stmt_total_due = $this->pdo->prepare("SELECT total_amount FROM purchases WHERE purchase_id = :purchase_id");
+        $stmt_total_due->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_total_due->execute();
+        $purchase = $stmt_total_due->fetch(PDO::FETCH_ASSOC);
+
+        if (!$purchase) {
+            $this->pdo->rollBack();
+            return ['success' => false, 'message' => 'Data pembelian tidak ditemukan.'];
+        }
+        $total_due_amount = (float)$purchase['total_amount'];
+
+        // 3. Hitung total yang sudah dibayar untuk pembelian ini
+        $stmt_total_paid = $this->pdo->prepare("SELECT SUM(amount_paid) as total_paid_sum FROM purchase_payments WHERE purchase_id = :purchase_id");
+        $stmt_total_paid->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_total_paid->execute();
+        $paid_summary = $stmt_total_paid->fetch(PDO::FETCH_ASSOC);
+        $current_total_paid = (float)($paid_summary['total_paid_sum'] ?? 0);
+
+        // 4. Tentukan status pembayaran baru
+        $new_payment_status = 'pending';
+        if ($current_total_paid >= $total_due_amount) {
+            $new_payment_status = 'paid';
+        } elseif ($current_total_paid > 0 && $current_total_paid < $total_due_amount) {
+            $new_payment_status = 'partially_paid';
+        }
+        // Jika $current_total_paid <= 0, tetap 'pending' (kecuali jika total_due_amount juga 0)
+        if ($total_due_amount == 0 && $current_total_paid == 0) { // Kasus khusus jika total tagihan 0
+             $new_payment_status = 'paid';
+        }
+
+
+        // 5. Update status pembayaran di tabel purchases
+        $sql_update_status = "UPDATE purchases SET payment_status = :payment_status, updated_at = NOW() WHERE purchase_id = :purchase_id";
+        $stmt_update_purchase = $this->pdo->prepare($sql_update_status);
+        $stmt_update_purchase->bindParam(':payment_status', $new_payment_status);
+        $stmt_update_purchase->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_update_purchase->execute();
+
+        $this->pdo->commit();
+
+        // Opsional: Log aktivitas
+        if ($userId) {
+            $this->logActivity($userId, 'ADD_PURCHASE_PAYMENT', "Pembayaran Rp {$data['amount_paid']} untuk pembelian #{$purchase_id}. Status: {$new_payment_status}");
+        }
+
+        return ['success' => true, 'message' => 'Pembayaran berhasil ditambahkan. Status pembelian telah diperbarui.'];
+
+    } catch (PDOException $e) {
+        if ($this->pdo->inTransaction()) {
+            $this->pdo->rollBack();
+        }
+        error_log("PDO Error (addPurchasePayment): " . $e->getMessage());
+        return ['success' => false, 'message' => 'Gagal menambahkan pembayaran: ' . $e->getMessage()];
+    }
+}
+
+/**
+ * Mengambil semua catatan pembayaran untuk sebuah pembelian.
+ * @param int $purchase_id ID pembelian
+ * @return array Daftar pembayaran
+ */
+public function getPurchasePayments($purchase_id)
+{
+    if (!$this->pdo) {
+        error_log("getPurchasePayments Error: No valid PDO connection.");
+        return [];
+    }
+    try {
+        $stmt = $this->pdo->prepare("SELECT * FROM purchase_payments WHERE purchase_id = :purchase_id ORDER BY payment_date DESC, created_at DESC");
+        $stmt->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("PDO Error (getPurchasePayments): " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Mengambil detail pembelian beserta ringkasan total yang sudah dibayar.
+ * @param int $purchase_id ID pembelian
+ * @return array|null Detail pembelian atau null jika tidak ditemukan
+ */
+public function getPurchaseWithPaymentSummary($purchase_id) {
+    if (!$this->pdo) {
+        error_log("getPurchaseWithPaymentSummary Error: No valid PDO connection.");
+        return null;
+    }
+    try {
+        // Query ini mengambil header pembelian dan subquery untuk total yang sudah dibayar
+        $sql = "SELECT p.*, s.supplier_name, u.name as user_name, 
+                       COALESCE((SELECT SUM(pp.amount_paid) FROM purchase_payments pp WHERE pp.purchase_id = p.purchase_id), 0) as total_amount_paid
+                FROM purchases p
+                LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
+                LEFT JOIN users u ON p.user_id = u.user_id
+                WHERE p.purchase_id = :purchase_id";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $purchase_header = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $purchase_header; // Akan null jika purchase_id tidak ditemukan
+
+    } catch (PDOException $e) {
+        error_log("PDO Error (getPurchaseWithPaymentSummary): " . $e->getMessage());
+        return null;
+    }
+}
+    
     public function getSuppliers()
     {
         // Periksa apakah koneksi PDO valid
@@ -1265,6 +1415,160 @@ class Farmamedika
         } catch (PDOException $e) {
             error_log("Database Error (getDoctorsForDropdown): " . $e->getMessage());
             return [];
+        }
+    }
+    
+    // Di dalam kelas Farmamedika
+
+    /**
+     * Mengambil ringkasan penjualan harian termasuk HPP dan laba bersih.
+     * @param string $date Tanggal dengan format YYYY-MM-DD
+     * @return array Ringkasan penjualan
+     */
+    public function getDailyFinancialReport($date)
+    {
+        if (!$this->pdo) {
+            error_log("getDailyFinancialReport Error: No valid PDO connection.");
+            return [
+                'total_revenue' => 0,
+                'revenue_by_method' => [],
+                'total_cogs' => 0,
+                'net_profit' => 0,
+                'total_purchase_payments' => 0,
+                'error' => 'Koneksi database gagal.'
+            ];
+        }
+    
+        $report = [
+            'total_revenue' => 0,
+            'revenue_by_method' => [],
+            'total_cogs' => 0,
+            'net_profit' => 0,
+            'total_purchase_payments' => 0,
+            'error' => null
+        ];
+    
+        try {
+            // 1. Total Pemasukan (Revenue) dan Pemasukan per Metode Bayar
+            $sql_revenue = "SELECT 
+                                SUM(s.total_amount) as daily_total_revenue,
+                                pm.method_name, 
+                                SUM(s.total_amount) as amount_by_method
+                            FROM sales s
+                            LEFT JOIN payment_methods pm ON s.payment_method_id = pm.payment_method_id
+                            WHERE DATE(s.sale_date) = :sale_date
+                            GROUP BY pm.payment_method_id, pm.method_name";
+            $stmt_revenue = $this->pdo->prepare($sql_revenue);
+            $stmt_revenue->bindParam(':sale_date', $date);
+            $stmt_revenue->execute();
+            $revenue_data = $stmt_revenue->fetchAll(PDO::FETCH_ASSOC);
+    
+            $total_revenue_sum = 0;
+            foreach ($revenue_data as $row) {
+                $method = $row['method_name'] ?? 'Tidak Diketahui';
+                $report['revenue_by_method'][$method] = (float)$row['amount_by_method'];
+                $total_revenue_sum += (float)$row['amount_by_method'];
+            }
+            $report['total_revenue'] = $total_revenue_sum;
+    
+    
+            // 2. Total Harga Pokok Penjualan (COGS)
+            // Asumsi: tabel 'products' memiliki kolom 'modal' (harga pokok/beli produk)
+            // Asumsi: tabel 'sale_items' memiliki 'product_id' dan 'quantity'
+            $sql_cogs = "SELECT SUM(si.quantity * p.cost_price) as total_cogs
+                 FROM sale_items si
+                 JOIN sales s ON si.sale_id = s.sale_id
+                 JOIN products p ON si.product_id = p.product_id
+                 WHERE DATE(s.sale_date) = :sale_date";
+            $stmt_cogs = $this->pdo->prepare($sql_cogs);
+            $stmt_cogs->bindParam(':sale_date', $date);
+            $stmt_cogs->execute();
+            $cogs_result = $stmt_cogs->fetch(PDO::FETCH_ASSOC);
+            $report['total_cogs'] = (float)($cogs_result['total_cogs'] ?? 0);
+    
+            // 3. Laba Bersih
+            $report['net_profit'] = $report['total_revenue'] - $report['total_cogs'];
+    
+            // 4. Total Pengeluaran (Pembayaran Pembelian Hari Ini)
+            $sql_expenses = "SELECT SUM(amount_paid) as daily_total_payments
+                             FROM purchase_payments
+                             WHERE DATE(payment_date) = :payment_date";
+            $stmt_expenses = $this->pdo->prepare($sql_expenses);
+            $stmt_expenses->bindParam(':payment_date', $date);
+            $stmt_expenses->execute();
+            $expenses_result = $stmt_expenses->fetch(PDO::FETCH_ASSOC);
+            $report['total_purchase_payments'] = (float)($expenses_result['daily_total_payments'] ?? 0);
+    
+        } catch (PDOException $e) {
+            error_log("PDO Error (getDailyFinancialReport for date {$date}): " . $e->getMessage());
+            $report['error'] = 'Gagal mengambil data laporan: ' . $e->getMessage();
+        }
+        return $report;
+    }
+    
+    /**
+     * Mengambil ringkasan pemasukan historis yang diagregasi per hari.
+     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
+     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
+     * @return array Daftar ringkasan pemasukan per hari
+     */
+    public function getHistoricalIncomeSummary($startDate, $endDate)
+    {
+        if (!$this->pdo) {
+            error_log("getHistoricalIncomeSummary Error: No valid PDO connection.");
+            return ['data' => [], 'error' => 'Koneksi database gagal.'];
+        }
+    
+        $summary = ['data' => [], 'error' => null];
+    
+        try {
+            $sql = "SELECT
+                        DATE(s.sale_date) as sale_day,
+                        SUM(s.total_amount) as daily_revenue,
+                        SUM(si.quantity * p.cost_price) as daily_cogs, /* Menggunakan cost_price */
+                        (SUM(s.total_amount) - SUM(si.quantity * p.cost_price)) as daily_net_profit
+                    FROM
+                        sales s
+                    JOIN
+                        sale_items si ON s.sale_id = si.sale_id
+                    JOIN
+                        products p ON si.product_id = p.product_id
+                    WHERE
+                        DATE(s.sale_date) BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        DATE(s.sale_date)
+                    ORDER BY
+                        sale_day DESC"; // Urutkan dari tanggal terbaru
+    
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':startDate', $startDate);
+            $stmt->bindParam(':endDate', $endDate);
+            $stmt->execute();
+            $summary['data'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+        } catch (PDOException $e) {
+            error_log("PDO Error (getHistoricalIncomeSummary from {$startDate} to {$endDate}): " . $e->getMessage());
+            $summary['error'] = 'Gagal mengambil data laporan historis: ' . $e->getMessage();
+        }
+        return $summary;
+    }
+    
+    /**
+     * Mendapatkan tanggal penjualan paling awal dari database.
+     * @return string|null Tanggal dalam format YYYY-MM-DD atau null jika tidak ada penjualan.
+     */
+    public function getEarliestSaleDate()
+    {
+        if (!$this->pdo) {
+            return null;
+        }
+        try {
+            $stmt = $this->pdo->query("SELECT MIN(DATE(sale_date)) as earliest_date FROM sales");
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result['earliest_date'] ?? null;
+        } catch (PDOException $e) {
+            error_log("PDO Error (getEarliestSaleDate): " . $e->getMessage());
+            return null;
         }
     }
 
