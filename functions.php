@@ -85,6 +85,44 @@ class Farmamedika
         return 'FM-'.$user.'-'. date('Ymd') . '-' . rand(1000, 9999);
     }
     
+    public function getSuppliersByProductId($productId)
+    {
+        // Periksa apakah koneksi PDO valid
+        if (!$this->pdo) {
+            error_log("getSuppliersByProductId Error: No valid PDO connection.");
+            return []; // Kembalikan array kosong jika tidak ada koneksi
+        }
+    
+        // Query untuk mendapatkan supplier berdasarkan product_id
+        $sql = "SELECT 
+                    s.supplier_id, 
+                    s.supplier_name, 
+                    s.contact_person, 
+                    s.phone, 
+                    s.is_active 
+                FROM suppliers s
+                INNER JOIN product_batches pb ON s.supplier_id = pb.supplier_id
+                WHERE pb.product_id = :product_id
+                ORDER BY s.supplier_name ASC"; // Urutkan berdasarkan nama supplier
+    
+        try {
+            // Siapkan dan eksekusi statement
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':product_id', $productId, PDO::PARAM_INT); // Bind parameter product_id
+            $stmt->execute();
+    
+            // Ambil semua hasil sebagai associative array
+            $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+            return $suppliers; // Kembalikan array hasil
+    
+        } catch (PDOException $e) {
+            // Log error jika query gagal
+            error_log("PDO Error fetching suppliers by product_id: " . $e->getMessage());
+            return []; // Kembalikan array kosong jika terjadi error
+        }
+    }
+    
     public function getSuppliers()
     {
         // Periksa apakah koneksi PDO valid
@@ -92,34 +130,22 @@ class Farmamedika
             error_log("getSuppliers Error: No valid PDO connection.");
             return []; // Kembalikan array kosong jika tidak ada koneksi
         }
-    
-        // Query yang diperbarui untuk menghubungkan tabel suppliers dan product_batches
-        $sql = "SELECT 
-                    s.supplier_id, 
-                    s.supplier_name, 
-                    s.contact_person, 
-                    s.phone, 
-                    s.is_active,
-                    GROUP_CONCAT(DISTINCT pb.product_id) AS related_product_ids
-                FROM 
-                    suppliers s
-                LEFT JOIN 
-                    product_batches pb ON s.supplier_id = pb.supplier_id
-                GROUP BY 
-                    s.supplier_id
-                ORDER BY 
-                    s.supplier_name ASC"; // Urutkan berdasarkan nama supplier
-    
+
+        // Kolom yang akan diambil (sesuai struktur setelah menghapus email/address)
+        $sql = "SELECT supplier_id, supplier_name, contact_person, phone, is_active 
+                FROM suppliers 
+                ORDER BY supplier_name ASC"; // Urutkan berdasarkan nama supplier
+
         try {
             // Siapkan dan eksekusi statement
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute();
-    
+
             // Ambil semua hasil sebagai associative array
-            $suppliers = $stmt->fetchAll();
+            $suppliers = $stmt->fetchAll(); 
             
             return $suppliers; // Kembalikan array hasil
-    
+
         } catch (PDOException $e) {
             // Log error jika query gagal
             error_log("PDO Error fetching suppliers: " . $e->getMessage());
@@ -153,6 +179,85 @@ class Farmamedika
             return [];
         }
     }*/
+    
+    public function getPurchases($startDate = null, $endDate = null) {
+        try {
+            $query = "SELECT p.*, s.supplier_name, u.name as user_name 
+                      FROM purchases p
+                      LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
+                      LEFT JOIN users u ON p.user_id = u.user_id";
+
+            $params = [];
+
+            if ($startDate && $endDate) {
+                $query .= " WHERE DATE(p.purchase_date) BETWEEN :start_date AND :end_date";
+                $params[':start_date'] = $startDate;
+                $params[':end_date'] = $endDate;
+            } elseif ($startDate) {
+                $query .= " WHERE DATE(p.purchase_date) >= :start_date";
+                $params[':start_date'] = $startDate;
+            } elseif ($endDate) {
+                $query .= " WHERE DATE(p.purchase_date) <= :end_date";
+                $params[':end_date'] = $endDate;
+            }
+
+            $query .= " ORDER BY p.purchase_date DESC";
+
+            $stmt = $this->pdo->prepare($query);
+
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+
+            $stmt->execute();
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Database Error (getPurchases): " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getPurchaseDetails($purchaseId) {
+        try {
+            // Get purchase header
+            $query = "SELECT p.*, s.supplier_name, u.name as user_name 
+                      FROM purchases p
+                      LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
+                      LEFT JOIN users u ON p.user_id = u.user_id
+                      WHERE p.purchase_id = :purchase_id";
+
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':purchase_id', $purchaseId, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $purchaseHeader = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$purchaseHeader) {
+                return false;
+            }
+
+            // Get purchase items
+            $query = "SELECT pi.*, p.product_name, p.kode_item, p.unit
+                      FROM purchase_items pi
+                      JOIN products p ON pi.product_id = p.product_id
+                      WHERE pi.purchase_id = :purchase_id";
+
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':purchase_id', $purchaseId, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $purchaseItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return [
+                'header' => $purchaseHeader,
+                'items' => $purchaseItems,
+            ];
+        } catch (PDOException $e) {
+            error_log("Database Error (getPurchaseDetails): " . $e->getMessage());
+            return false;
+        }
+    }
     
     public function getAllProducts()
     {
@@ -269,6 +374,35 @@ class Farmamedika
         } catch (PDOException $e) {
             error_log("Database Error (getAllUsers): " . $e->getMessage());
             return [];
+        }
+    }
+    public function deleteSale($saleId) 
+    {
+        try {
+            // Mulai transaksi
+            $this->pdo->beginTransaction();
+            
+            // Hapus item penjualan terlebih dahulu (child records)
+            $query = "DELETE FROM sale_items WHERE sale_id = :sale_id";
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':sale_id', $saleId, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            // Hapus data penjualan (parent record)
+            $query = "DELETE FROM sales WHERE sale_id = :sale_id";
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':sale_id', $saleId, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            // Commit transaksi
+            $this->pdo->commit();
+            
+            return true;
+        } catch (PDOException $e) {
+            // Rollback jika terjadi error
+            $this->pdo->rollBack();
+            error_log("Database Error (deleteSale): " . $e->getMessage());
+            return false;
         }
     }
     
