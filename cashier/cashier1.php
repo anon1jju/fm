@@ -11,6 +11,10 @@
 // Include file fungsi cashier
 require_once '../functions.php';
 
+if (!$farma->checkPersistentSession()) {
+    header("Location: ../signin.php");
+    exit;
+}
 // Cek session untuk autentikasi (implementasi sesuai sistem login Anda)
 // session_start();
 // if (!isset($_SESSION['user_id'])) {
@@ -60,10 +64,10 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="hidden md:inline-block">Kasir: <span id="cashier-name"><? echo $_SESSION["username"]?></span></span>
-                    <button class="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded-md">
+                    <a href="../logout.php" class="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded-md inline-flex items-center text-white">
                         <i class="fas fa-sign-out-alt mr-1"></i>
                         <span class="hidden md:inline-block">Logout</span>
-                    </button>
+                    </a>
                 </div>
             </div>
         </header>
@@ -100,7 +104,7 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
                 </div>
 
                 <!-- Products Grid -->
-                <div id="products-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div id="products-container" class="max-h-[70vh] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <?php foreach ($popularProducts as $product): ?>
                         <div class="product-card bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition" 
                              data-product='<?php echo json_encode([
@@ -134,13 +138,13 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
             <!-- Right Panel - Cart -->
             <div class="w-full md:w-1/3 bg-white shadow-md p-4 flex flex-col">
                 <!-- Customer Info -->
-                <!--<div class="mb-4">
-                    <h2 class="text-lg font-semibold mb-2">Informasi Pelanggan</h2>
+                <div class="mb-4">
+                    <h2 class="text-lg font-semibold mb-2">Pelanggan</h2>
                     <div class="flex space-x-2">
                         <input type="text" id="customer-name" placeholder="Nama Pelanggan" 
                                class="flex-grow px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
-                </div>-->
+                </div>
 
                 <!-- Prescription Info (hidden by default) -->
                 <div id="prescription-info" class="mb-4 hidden">
