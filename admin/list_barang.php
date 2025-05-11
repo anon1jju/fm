@@ -7,10 +7,12 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
     exit();
 }
 
-try {
-    // Inisialisasi array kosong untuk mencegah error jika terjadi kegagalan query
-    $dataProduk = $suppliers = $categories = $units = [];
+// Inisialisasi variables
+$dataProduk = $suppliers = $categories = $units = [];
+$errorMessage = null;
+$jumlahProduk = $produkTersedia = $totalStokUnit = 0;
 
+try {
     // Ambil koneksi PDO
     $pdo = $farma->getPDO();
     if (!$pdo) {
@@ -18,44 +20,33 @@ try {
     }
 
     // Ambil data produk
-    $dataProduk = $farma->getAllProducts(); // Asumsi ada fungsi getAllProducts()
+    $dataProduk = $farma->getAllProducts();
     
     // Hitung jumlah produk
     $jumlahProduk = count($dataProduk);
     
     // Hitung jumlah produk dengan stok tersedia (> 0)
-    $produkTersedia = 0;
-    $totalStokUnit = 0;
+    $produkTersedia = $totalStokUnit = 0;
     foreach ($dataProduk as $produk) {
         if ($produk['stock_quantity'] > 0) {
             $produkTersedia++;
             $totalStokUnit += $produk['stock_quantity'];
         }
     }
-
     
-    // Ambil data kategori produk
-    $query = "SELECT supplier_id, supplier_name FROM suppliers";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute();
-    $suppliers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Ambil data kategori produk
-    $query = "SELECT category_id, category_name FROM product_categories";
-    $stmt = $pdo->prepare($query);
-    $stmt->execute();
-    $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Ambil data unit
+    // Gunakan metode dari class Farmamedika untuk mendapatkan data
+    $suppliers = $farma->getSuppliers();
+    $categories = $farma->getAllCategories();
+    
+    // Ambil data unit - masih menggunakan query langsung karena belum ada metode di class
     $query = "SELECT unit_name FROM units ORDER BY unit_name ASC";
     $stmt = $pdo->prepare($query);
     $stmt->execute();
     $units = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (Exception $e) {
-    // Tangani error dengan mencatat log dan inisialisasi data sebagai array kosong
+    // Tangani error dengan lebih informatif
     error_log("Error: " . $e->getMessage());
-    $dataProduk = $suppliers = $categories = $units = [];
     $errorMessage = "Terjadi kesalahan saat memuat data. Silakan coba lagi nanti.";
 }
 ?>
@@ -369,8 +360,45 @@ try {
                                                                 <!-- Stok -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Stok</label>
-                                                                    <input type="tel" class="ti-form-control" name="stok_barang" value="<?php echo htmlspecialchars($produk['stock_quantity']); ?>" required />
+                                                                    <!-- Original stock display (read-only) -->
+                                                                    <div class="mb-2">
+                                                                        <input type="tel" class="ti-form-control" value="<?php echo htmlspecialchars($produk['stock_quantity']); ?>" readonly />
+                                                                        <small class="text-muted">Stok saat ini</small>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Stock adjustment section -->
+                                                                    <div class="border p-3 rounded bg-light">
+                                                                        <label class="ti-form-label mb-2">Perubahan Stok:</label>
+                                                                        
+                                                                        <!-- Adjustment amount input -->
+                                                                        <div class="mb-2">
+                                                                            <input type="tel" class="ti-form-control" id="adjustment-amount-<?php echo $produk['product_id']; ?>" 
+                                                                                   name="stock_adjustment_amount" min="1" placeholder="Jumlah" value="" />
+                                                                        </div>
+                                                                        
+                                                                        <!-- Adjustment type radio buttons -->
+                                                                        <div class="grid grid-cols-2 gap-2">
+                                                                            <div class="flex items-center">
+                                                                                <input type="radio" class="ti-form-radio" id="add-stock-<?php echo $produk['product_id']; ?>" 
+                                                                                       name="stock_adjustment_type" value="add" checked />
+                                                                                <label for="add-stock-<?php echo $produk['product_id']; ?>" class="ms-2 text-sm">
+                                                                                    <i class="ri-add-circle-line text-success text-2xl"></i>
+                                                                                </label>
+                                                                            </div>
+                                                                            <div class="flex items-center">
+                                                                                <input type="radio" class="ti-form-radio" id="subtract-stock-<?php echo $produk['product_id']; ?>" 
+                                                                                       name="stock_adjustment_type" value="subtract" />
+                                                                                <label for="subtract-stock-<?php echo $produk['product_id']; ?>" class="ms-2 text-sm">
+                                                                                    <i class="ri-subtract-line text-danger text-2xl"></i>
+                                                                                </label>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Hidden original stock field for reference -->
+                                                                    <input type="hidden" name="original_stock" value="<?php echo htmlspecialchars($produk['stock_quantity']); ?>" />
                                                                 </div>
+                                                                
                                                                 <!-- Stok Minimum -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Stok Min</label>
@@ -380,7 +408,7 @@ try {
                                                                 <div class="xl:col-span-6 col-span-12">
                                                                     <label class="ti-form-label">Supplier</label>
                                                                     <select class="ti-form-control" name="supplier_id">
-                                                                        <option value="" disabled>Pilih Supplier</option>
+                                                                        <option class="font-semibold" value=""><?php echo $supplier_name;?></option>
                                                                         <?php foreach ($suppliers as $supplier): ?>
                                                                         <option value="<?= htmlspecialchars($supplier['supplier_id'], ENT_QUOTES, 'UTF-8') ?>" 
                                                                             <?= $produk['supplier_id'] == $supplier['supplier_id'] ? 'selected' : '' ?>>
@@ -413,7 +441,19 @@ try {
                 </div>
             </div>
         </div>
-        
+        <div class="grid grid-cols-12 gap-x-6">
+            <div class="xl:col-span-12 col-span-12">
+                <div class="box">
+                    <div class="box-header justify-between">
+                        <div class="box-title">
+                            <i class="ri-box-3-line text-2xl"></i> Item Keluar 
+                            
+                        </div>
+                        <!--End::row-2 -->
+                    </div>
+                </div>
+            </div>
+        </div>
             <!-- End::app-content -->
             <?php include "includes/footer.php";?>
         </div>
