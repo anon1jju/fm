@@ -132,7 +132,7 @@ try {
                                                     <!-- Expire -->
                                                     <div class="xl:col-span-3 col-span-12">
                                                         <label class="ti-form-label">Expire</label>
-                                                        <input type="tel" class="ti-form-control" name="expire" placeholder="DD-MM-YYYY" required>
+                                                        <input type="tel" class="ti-form-control" name="expire" required>
                                                     </div>
                                                     <!-- Batch Number -->
                                                     <div class="xl:col-span-3 col-span-12">
@@ -328,7 +328,7 @@ try {
                                                                 <!-- Expire -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Expire</label>
-                                                                    <input type="tel" class="ti-form-control" id="expire" name="expire" value="<?php echo htmlspecialchars($produk['expiry_date']); ?>" required />
+                                                                    <input type="tel" class="ti-form-control" name="expire" value="<?php echo htmlspecialchars($produk['expiry_date']); ?>" required />
                                                                 </div>
                                                                 <!-- Batch Number -->
                                                                 <div class="xl:col-span-3 col-span-12">
@@ -456,7 +456,7 @@ try {
         <script src="../assets/js/custom.js"></script>
         <!-- Custom-Switcher JS -->
         <script src="../assets/js/custom-switcher.min.js"></script>
-        <script src="../assets/js/autoformatexpire.js" defer></script>
+        <!--<script src="../assets/js/autoformatexpire.js" defer></script>-->
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <script>
             function confirmDelete(productId, productName) {
