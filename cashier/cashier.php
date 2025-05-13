@@ -62,7 +62,21 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
                     <i class="fas fa-pills text-2xl mr-2"></i>
                     <h1 class="text-xl font-semibold">Farma Medika - <? echo $_SESSION["username"]?></h1>
                 </div>
+                
                 <div class="flex items-center space-x-4">
+                    <div class="relative inline-block text-left"> <!-- Wrapper for positioning -->
+                        <button id="view-pending-btn" class="relative bg-orange-400 hover:bg-orange-500 text-white px-4 py-2 rounded-md font-medium inline-flex items-center">
+                            <i class="fas fa-pause-circle mr-1"></i>
+                            <span id="pending-count-badge-container" class="absolute -top-2 -right-2"> 
+                                <!-- Badge will be dynamically shown/hidden here by JS -->
+                            </span>
+                        </button>
+                        <div id="pending-transactions-list" 
+                             class="origin-top-right absolute right-0 mt-2 w-80 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-[60] max-h-80 overflow-y-auto">
+                            <!-- Content will be injected here by JS. JS should append to this div directly. -->
+                            <!-- The py-1, role, etc. divs can be removed if JS directly populates this with a list or message -->
+                        </div>
+                    </div>
                     <span class="hidden md:inline-block">Kasir: <span id="cashier-name"><? echo $_SESSION["username"]?></span></span>
                     <a href="../logout.php" class="bg-blue-700 hover:bg-blue-800 px-3 py-1 rounded-md inline-flex items-center text-white">
                         <i class="fas fa-sign-out-alt mr-1"></i>
@@ -104,7 +118,7 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
                 </div>
 
                 <!-- Products Grid -->
-                <div id="products-container" class="max-h-[70vh] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div id="products-container" class="scrollspy-scrollable-parent-2 max-h-[50vh] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     <?php foreach ($popularProducts as $product): ?>
                         <div class="product-card bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition" 
                              data-product='<?php echo json_encode([
@@ -182,10 +196,10 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
                         <span>Subtotal</span>
                         <span id="subtotal">Rp 0</span>
                     </div>
-                    <div class="flex justify-between mb-1">
+                    <!--<div class="flex justify-between mb-1">
                         <span>Pajak (0%)</span>
                         <span id="tax-amount">Rp 0</span>
-                    </div>
+                    </div>-->
                     <div class="flex justify-between mb-1">
                         <span>Diskon</span>
                         <div class="flex items-center">
@@ -224,6 +238,10 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
                             </button>
                         <?php endforeach; ?>
                     </div>
+                    <button id="hold-transaction-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white w-full py-2 rounded-md font-medium mb-2">
+    <i class="fas fa-pause-circle mr-1"></i> Tahan Transaksi
+</button>
+
                     
                     <!-- Cash Payment Input (only shown for cash payments) -->
                     <div id="cash-payment-fields" class="mb-3 hidden">
@@ -269,6 +287,222 @@ $popularProducts = $farma->getPopularProductsForCashier(12);
             </div>
         </div>
     </div>
+    <script>
+    $(document).ready(function() {
+        // --- Pending Transactions Variables & Initialization ---
+        let pendingTransactions_inline = JSON.parse(localStorage.getItem('pendingTransactions_fm_inline')) || [];
+    
+        function updatePendingCount_inline() {
+            const count = pendingTransactions_inline.length; // Get the count
+            const badgeContainer = $('#pending-count-badge-container');
+        
+            if (count > 0) {
+                // Create and show the badge
+                badgeContainer.html(`<span id="pending-count" class="flex items-center justify-center text-xs font-bold text-white bg-red-600 !rounded-full h-5 w-5">${count}</span>`);
+                // The !rounded-full is to override other Tailwind rounding if necessary.
+                // Tailwind's bg-danger might be bg-red-600 or similar. Adjust if you have a custom 'danger' class.
+            } else {
+                // Hide or remove the badge if count is 0
+                badgeContainer.empty(); // Remove the badge span
+            }
+        }
+    
+        function renderPendingTransactionsList_inline() {
+    const listContainer = $('#pending-transactions-list');
+    listContainer.empty(); // Clear previous content
+
+    if (pendingTransactions_inline.length === 0) {
+        listContainer.append('<div class="p-4 text-center text-sm text-gray-500">Tidak ada transaksi tertunda.</div>');
+        return;
+    }
+
+    const ul = $('<ul class="divide-y divide-gray-100"></ul>'); // Using Tailwind's divide for separators
+    pendingTransactions_inline.forEach((txn, index) => {
+        // Using slightly more Tailwind classes for better default styling within the dropdown
+        const li = $(`
+            <li class="p-3 hover:bg-gray-50">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm">
+                        <p class="font-medium text-gray-900">ID: ${txn.id.substring(txn.id.length - 6)} (${txn.customerName || 'N/A'})</p>
+                        <p class="text-gray-500">${txn.items.length} item - Total: ${formatCurrency(txn.grandTotal || 0)}</p>
+                    </div>
+                    <div class="ml-2 flex-shrink-0 flex">
+                        <button class="resume-pending-btn-inline p-1 inline-flex items-center justify-center text-green-500 hover:text-green-700 focus:outline-none" data-index="${index}" title="Lanjutkan">
+                            <i class="fas fa-play-circle fa-lg"></i>
+                        </button>
+                        <button class="delete-pending-btn-inline p-1 inline-flex items-center justify-center text-red-500 hover:text-red-700 focus:outline-none" data-index="${index}" title="Hapus">
+                            <i class="fas fa-trash-alt fa-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="mt-1 text-xs text-gray-500">Ditahan: ${txn.timestamp}</p>
+            </li>
+        `);
+        ul.append(li);
+    });
+    listContainer.append(ul);
+}
+    
+        // Function to clear UI elements for a new or held transaction
+        // Relies on global cartItems, renderCartItems, updateCartSummary, selectedPaymentMethod from your js/cashier.js
+        function clearUIForHeldOrNewTransaction_inline() {
+            cartItems = []; // This is your global cartItems from js/cashier.js
+            renderCartItems(); // Your global function
+            
+            $('#customer-name').val('');
+            $('#doctor-id').val('').trigger('change'); 
+            $('#prescription-number').val('');
+            $('#discount-amount').val('0'); 
+            
+            selectedPaymentMethod = null; // Your global variable
+            $('.payment-method-btn').removeClass('bg-blue-500 text-white').addClass('bg-blue-100 text-blue-600');
+            $('#cash-payment-fields').addClass('hidden');
+            $('#cash-amount').val('');
+            $('#change-amount').text(formatCurrency(0)); // Your global formatCurrency
+            
+            updateCartSummary(); // Your global function
+        }
+    
+        // Initialize count and list on page load
+        updatePendingCount_inline();
+        if ($('#pending-transactions-list').length) {
+            renderPendingTransactionsList_inline();
+        }
+    
+    
+        // --- Pending Transaction Event Handlers ---
+    
+        $('#hold-transaction-btn').on('click', function() {
+            // cartItems is the global array from your js/cashier.js
+            if (cartItems.length === 0) {
+                Swal.fire('Info', 'Keranjang kosong, tidak ada yang bisa dihold.', 'info');
+                return;
+            }
+    
+            let currentSubtotal = 0; 
+            cartItems.forEach(item => { currentSubtotal += item.total; });
+            
+            const currentDiscountString = String($('#discount-amount').val()).replace(/[^\d]/g, '');
+            const currentDiscount = parseInt(currentDiscountString) || 0;
+            const currentGrandTotal = currentSubtotal - currentDiscount;
+    
+            const transactionToHold = {
+                id: 'txn_inline_' + Date.now(),
+                timestamp: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short'}),
+                customerName: $('#customer-name').val().trim(),
+                doctorId: $('#doctor-id').val(),
+                prescriptionNumber: $('#prescription-number').val().trim(),
+                items: JSON.parse(JSON.stringify(cartItems)), // Deep copy of cartItems
+                discount: currentDiscount,
+                subtotal: currentSubtotal,
+                grandTotal: currentGrandTotal
+            };
+    
+            pendingTransactions_inline.push(transactionToHold);
+            localStorage.setItem('pendingTransactions_fm_inline', JSON.stringify(pendingTransactions_inline));
+            
+            clearUIForHeldOrNewTransaction_inline();
+            updatePendingCount_inline();
+            renderPendingTransactionsList_inline(); 
+    
+            Swal.fire('Berhasil', 'Transaksi telah dihold.', 'success');
+        });
+    
+        $('#view-pending-btn').on('click', function(event) {
+            event.stopPropagation(); // Prevent click from closing the dropdown immediately if it's part of it
+            renderPendingTransactionsList_inline(); 
+            // This toggles visibility. If using absolute positioning for dropdown, this works.
+            $('#pending-transactions-list').toggleClass('hidden'); 
+        });
+    
+        // Hide pending list if clicked outside (for dropdown behavior)
+        $(document).on('click', function(event) {
+            if (!$('#view-pending-btn').is(event.target) && $('#view-pending-btn').has(event.target).length === 0 &&
+                !$('#pending-transactions-list').is(event.target) && $('#pending-transactions-list').has(event.target).length === 0) {
+                $('#pending-transactions-list').addClass('hidden');
+            }
+        });
+    
+    
+        // Event delegation for dynamically added resume/delete buttons
+        $('#pending-transactions-list').on('click', '.resume-pending-btn-inline', function() {
+            const index = $(this).data('index');
+            const transactionToResume = pendingTransactions_inline[index];
+    
+            // cartItems is global from your js/cashier.js
+            if (cartItems.length > 0) {
+                 Swal.fire({
+                    title: 'Transaksi Aktif!',
+                    text: "Ada item di keranjang. Tahan transaksi saat ini atau kosongkan untuk melanjutkan?",
+                    icon: 'warning',
+                    showDenyButton: true,
+                    showCancelButton: true,
+                    confirmButtonText: 'Tahan Saat Ini',
+                    denyButtonText: `Kosongkan Saat Ini`,
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#eab308', 
+                    denyButtonColor: '#ef4444', 
+                }).then((result) => {
+                    if (result.isConfirmed) { 
+                        $('#hold-transaction-btn').click(); 
+                        if(cartItems.length === 0) { // Check if hold was successful
+                            loadHeldTransactionIntoUI_inline(transactionToResume, index);
+                        } else {
+                             Swal.fire('Info', 'Transaksi saat ini belum ditahan. Silakan coba lagi atau kosongkan.', 'info');
+                        }
+                    } else if (result.isDenied) { 
+                        clearUIForHeldOrNewTransaction_inline(); 
+                        loadHeldTransactionIntoUI_inline(transactionToResume, index);
+                    }
+                });
+            } else {
+                loadHeldTransactionIntoUI_inline(transactionToResume, index);
+            }
+        });
+        
+        function loadHeldTransactionIntoUI_inline(txn, originalIndex) {
+            clearUIForHeldOrNewTransaction_inline(); 
+    
+            cartItems = JSON.parse(JSON.stringify(txn.items)); // Restore to global cartItems
+            renderCartItems(); // Your global function
+    
+            $('#customer-name').val(txn.customerName);
+            $('#doctor-id').val(txn.doctorId).trigger('change');
+            $('#prescription-number').val(txn.prescriptionNumber);
+            $('#discount-amount').val(txn.discount || '0');
+            
+            updateCartSummary(); // Your global function
+    
+            pendingTransactions_inline.splice(originalIndex, 1);
+            localStorage.setItem('pendingTransactions_fm_inline', JSON.stringify(pendingTransactions_inline));
+            updatePendingCount_inline();
+            renderPendingTransactionsList_inline();
+            $('#pending-transactions-list').addClass('hidden');
+    
+            Swal.fire('Berhasil', `Transaksi ${txn.id.substring(txn.id.length - 6)} telah dilanjutkan.`, 'success');
+        }
+    
+        $('#pending-transactions-list').on('click', '.delete-pending-btn-inline', function() {
+            const index = $(this).data('index');
+            Swal.fire({
+                title: 'Anda yakin?',
+                text: "Transaksi tertunda ini akan dihapus permanen!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33', cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Ya, hapus!', cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    pendingTransactions_inline.splice(index, 1);
+                    localStorage.setItem('pendingTransactions_fm_inline', JSON.stringify(pendingTransactions_inline));
+                    updatePendingCount_inline();
+                    renderPendingTransactionsList_inline();
+                    Swal.fire('Dihapus!', 'Transaksi tertunda telah dihapus.', 'success');
+                }
+            });
+        });
+    });
+    </script>
     <script src="js/cashier.js"></script>
 </body>
 </html>
