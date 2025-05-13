@@ -55,6 +55,11 @@ try {
     <head>
         <?php include "includes/meta.php";?>
         <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .flatpickr-calendar {
+    z-index: 99999 !important; /* Angka yang sangat tinggi, pastikan lebih tinggi dari z-index modal */
+}
+        </style>
     </head>
     <body>
         <?php include "includes/switch.php";?>
@@ -132,7 +137,7 @@ try {
                                                     <!-- Expire -->
                                                     <div class="xl:col-span-3 col-span-12">
                                                         <label class="ti-form-label">Expire</label>
-                                                        <input type="tel" class="ti-form-control" name="expire" required>
+                                                        <input type="text" class="ti-form-control flatpickr-date" name="expire" placeholder="YYYY-MM-DD" required>
                                                     </div>
                                                     <!-- Batch Number -->
                                                     <div class="xl:col-span-3 col-span-12">
@@ -155,7 +160,7 @@ try {
                                                         <select class="ti-form-control" name="unit">
                                                             <option value="" disabled selected>Pilih Unit</option>
                                                             <?php foreach ($units as $unit): ?>
-                                                            <option value="<?= htmlspecialchars($unit['unit_name'], ENT_QUOTES, 'UTF-8') ?>" <?= $produk['unit'] == $unit['unit_name'] ? 'selected' : '' ?>>
+                                                            <option value="<?= htmlspecialchars($unit['unit_name'], ENT_QUOTES, 'UTF-8') ?>" >
                                                                 <?= htmlspecialchars($unit['unit_name'], ENT_QUOTES, 'UTF-8') ?>
                                                             </option>
                                                             <?php endforeach; ?>
@@ -251,7 +256,7 @@ try {
                                             <div class="flex">
                                                 <div class="ms-2">
                                                     <p class="font-semibold mb-0 flex items-center"><a href="javascript:void(0);"><?php echo htmlspecialchars($produk['product_name']); ?></a></p>
-                                                    <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0"><?php echo htmlspecialchars($produk['posisi']). ' - '.htmlspecialchars($produk['kode_item']). ' - '.htmlspecialchars($produk['batch_number']); ?></p>
+                                                    <p class="text-sm text-textmuted dark:text-textmuted/50 mb-0"><?php echo htmlspecialchars($produk['posisi']). ' - '.htmlspecialchars($produk['kode_item']);?></p>
                                                 </div>
                                             </div>
                                         </td>
@@ -272,7 +277,7 @@ try {
                                                 <i class="ri-edit-line"></i>
                                                 </a>
                                                 <!-- Tombol Hapus -->
-                                                <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" onclick="confirmDelete(<?php echo $produk['product_id']; ?>, '<?php echo htmlspecialchars($produk['product_name'], ENT_QUOTES, 'UTF-8'); ?>')">
+                                                <a href="javascript:void(0);" class="ti-btn ti-btn-icon ti-btn-md ti-btn-soft-danger product-btn" onclick="confirmDelete(<?php echo $produk['product_id']; ?>, '<?php echo htmlspecialchars(addslashes($produk['product_name'])); ?>')">
                                                 <i class="ri-delete-bin-line"></i>
                                                 </a>
                                             </div>
@@ -328,12 +333,12 @@ try {
                                                                 <!-- Expire -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Expire</label>
-                                                                    <input type="tel" class="ti-form-control" name="expire" value="<?php echo htmlspecialchars($produk['expiry_date']); ?>" required />
+                                                                    <input type="text" class="ti-form-control" id="expire" name="expire" value="<?php echo htmlspecialchars($produk['expiry_date']); ?>" placeholder="DD-MM-YYYY" required />
                                                                 </div>
                                                                 <!-- Batch Number -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Batch Number</label>
-                                                                    <input type="text" class="ti-form-control" name="batch_number" value="<?php echo htmlspecialchars($produk['batch_number']); ?>"  />
+                                                                    <input type="text" class="ti-form-control" name="batch_number" value="<?php echo htmlspecialchars($produk['batch_number']); ?>" />
                                                                 </div>
                                                                 <!-- Kode Item -->
                                                                 <div class="xl:col-span-3 col-span-12">
@@ -357,26 +362,45 @@ try {
                                                                         <?php endforeach; ?>
                                                                     </select>
                                                                 </div>
-                                                                <!-- Stok -->
+                                                                
+                                                                <!-- Stok Saat Ini (Read-only atau sebagai referensi) -->
                                                                 <div class="xl:col-span-3 col-span-12">
-                                                                    <label class="ti-form-label">Stok</label>
-                                                                    <input type="tel" class="ti-form-control" name="stok_barang" value="<?php echo htmlspecialchars($produk['stock_quantity']); ?>" required />
+                                                                    <label class="ti-form-label">Stok Saat Ini</label>
+                                                                    <input type="text" class="ti-form-control" name="stok_saat_ini_display" step="0.01" value="<?php echo htmlspecialchars($produk['stock_quantity']); ?>" disabled />
+                                                                </div>
+
+                                                                <!-- Operasi Stok -->
+                                                                <div class="xl:col-span-3 col-span-12">
+                                                                    <label class="ti-form-label">Operasi Stok</label>
+                                                                    <div>
+                                                                        <input type="radio" step="0.01" name="operasi_stok_<?php echo $produk['product_id']; ?>" value="tambah" id="tambah_stok_<?php echo $produk['product_id']; ?>" class="ti-form-radio" checked>
+                                                                        <label for="tambah_stok_<?php echo $produk['product_id']; ?>" class="me-2"><i class="ri-add-line"></i>Tambah</label>
+                                                                        <input type="radio" step="0.01" name="operasi_stok_<?php echo $produk['product_id']; ?>" value="kurang" id="kurang_stok_<?php echo $produk['product_id']; ?>" class="ti-form-radio">
+                                                                        <label for="kurang_stok_<?php echo $produk['product_id']; ?>"><span><i class="ri-subtract-line"></i></span>Kurang</label>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Jumlah Perubahan Stok -->
+                                                                <div class="xl:col-span-3 col-span-12">
+                                                                    <label class="ti-form-label">Jumlah Perubahan</label>
+                                                                    <input type="tel" class="ti-form-control" name="jumlah_perubahan_stok" step="0.01" placeholder="0" />
+                                                                    <small class="text-muted">Masukkan jumlah stok yang akan ditambahkan/dikurangkan.</small>
                                                                 </div>
                                                                 
-                                                                <!-- Stok Minimum -->
+                                                                <!-- Stok Minimum (tetap ada jika masih diperlukan) -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Stok Min</label>
-                                                                    <input type="tel" class="ti-form-control" name="stok_minimum" value="<?php echo htmlspecialchars($produk['minimum_stock']); ?>" required />
+                                                                    <input type="tel" class="ti-form-control" name="stok_minimum" step="0.01" value="<?php echo htmlspecialchars($produk['minimum_stock']); ?>" required />
                                                                 </div>
                                                                 <!-- Supplier -->
                                                                 <div class="xl:col-span-6 col-span-12">
                                                                     <label class="ti-form-label">Supplier</label>
                                                                     <select class="ti-form-control" name="supplier_id">
-                                                                        <option value="" disabled><?php echo $supplier_name;?></option>
+                                                                        <option class="font-semibold text-sm" value=""><?php echo $supplier_name;?></option>
                                                                         <?php foreach ($suppliers as $supplier): ?>
                                                                         <option value="<?= htmlspecialchars($supplier['supplier_id'], ENT_QUOTES, 'UTF-8') ?>" 
                                                                             <?= $produk['supplier_id'] == $supplier['supplier_id'] ? 'selected' : '' ?>>
-                                                                            <?= htmlspecialchars($produk['supplier_name'], ENT_QUOTES, 'UTF-8') ?>
+                                                                            <?= htmlspecialchars($supplier['supplier_name'], ENT_QUOTES, 'UTF-8') ?> <!-- Corrected to show supplier_name -->
                                                                         </option>
                                                                         <?php endforeach; ?>
                                                                     </select>
@@ -405,19 +429,7 @@ try {
                 </div>
             </div>
         </div>
-        <div class="grid grid-cols-12 gap-x-6">
-            <div class="xl:col-span-12 col-span-12">
-                <div class="box">
-                    <div class="box-header justify-between">
-                        <div class="box-title">
-                            <i class="ri-box-3-line text-2xl"></i> Item Keluar 
-                            
-                        </div>
-                        <!--End::row-2 -->
-                    </div>
-                </div>
-            </div>
-        </div>
+    
             <!-- End::app-content -->
             <?php include "includes/footer.php";?>
         </div>
@@ -456,10 +468,12 @@ try {
         <script src="../assets/js/custom.js"></script>
         <!-- Custom-Switcher JS -->
         <script src="../assets/js/custom-switcher.min.js"></script>
-        <!--<script src="../assets/js/autoformatexpire.js" defer></script>-->
+        <script src="../assets/js/autoformatexpire.js" defer></script>
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        
         <script>
-            function confirmDelete(productId, productName) {
+        
+        function confirmDelete(productId, productName) {
                 Swal.fire({
                     title: 'Apakah Anda yakin menghapus produk "' + productName + '"?',
                     text: "Produk tersebut akan dihapus secara permanen!",
@@ -497,4 +511,3 @@ try {
         </script>
     </body>
 </html>
-
