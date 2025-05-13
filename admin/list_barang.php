@@ -6,6 +6,7 @@ if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../signin.php");
     exit();
 }
+$no = 0;
 
 // Inisialisasi variables
 $dataProduk = $suppliers = $categories = $units = [];
@@ -137,7 +138,7 @@ try {
                                                     <!-- Expire -->
                                                     <div class="xl:col-span-3 col-span-12">
                                                         <label class="ti-form-label">Expire</label>
-                                                        <input type="text" class="ti-form-control flatpickr-date" name="expire" placeholder="YYYY-MM-DD" required>
+                                                        <input type="text" class="ti-form-control" name="expire" placeholder="DD-MM-YYYY" required>
                                                     </div>
                                                     <!-- Batch Number -->
                                                     <div class="xl:col-span-3 col-span-12">
@@ -206,6 +207,7 @@ try {
                             <table class="scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 table border border-defaultborder dark:border-defaultborder/10 text-nowrap">
                                 <thead class="bg-sky-400 sticky top-0">
                                     <tr class="border-b border-defaultborder dark:border-defaultborder/10">
+                                        <th scope="col">No</th>
                                         <th scope="col">Produk</th>
                                         <th scope="col">Barcode</th>
                                         <th scope="col">Kategori</th>
@@ -222,6 +224,7 @@ try {
                                     <?php if (!empty($dataProduk)): ?> 
                                     <?php foreach ($dataProduk as $produk): ?> 
                                     <?php 
+                                        $no++;
                                         $modal = "Rp ".number_format($produk['cost_price'], 2, ',', '.');
                                         $jual = "Rp ".number_format($produk['price'], 2, ',', '.');
                                         $expire_produk = json_decode($farma->daysUntilExpire($produk['expiry_date']), true);
@@ -252,6 +255,7 @@ try {
                                         // Supplier
                                             $supplier_name = !empty($produk['supplier_name']) ? htmlspecialchars($produk['supplier_name']) : 'Tidak Diketahui';?> 
                                     <tr class="product-list border-b border-defaultborder dark:border-defaultborder/10">
+                                        <td><?php echo htmlspecialchars($no); ?></td>
                                         <td>
                                             <div class="flex">
                                                 <div class="ms-2">
@@ -333,7 +337,7 @@ try {
                                                                 <!-- Expire -->
                                                                 <div class="xl:col-span-3 col-span-12">
                                                                     <label class="ti-form-label">Expire</label>
-                                                                    <input type="text" class="ti-form-control" id="expire" name="expire" value="<?php echo htmlspecialchars($produk['expiry_date']); ?>" placeholder="DD-MM-YYYY" required />
+                                                                    <input type="text" class="ti-form-control" id="expire" name="expire" value="<?php echo htmlspecialchars(date('d-m-Y', strtotime($produk['expiry_date']))); ?>" placeholder="DD-MM-YYYY" required />
                                                                 </div>
                                                                 <!-- Batch Number -->
                                                                 <div class="xl:col-span-3 col-span-12">
