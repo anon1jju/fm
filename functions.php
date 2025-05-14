@@ -76,6 +76,136 @@ class Farmamedika
         exit();
     }
     
+    public function getOutstandingInvoicesBySupplier(string $supplier_name): array {
+        $sql = "SELECT 
+                    purchase_id, 
+                    total_amount, 
+                    amount_already_paid, 
+                    payment_status, -- Ambil juga status saat ini jika diperlukan untuk logika
+                    due_date, 
+                    purchase_date
+                FROM 
+                    purchases
+                WHERE 
+                    supplier_name = :supplier_name 
+                    AND amount_already_paid < total_amount -- Kondisi utama: belum lunas
+                ORDER BY 
+                    due_date ASC, 
+                    purchase_date ASC";
+
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':supplier_name', $supplier_name, PDO::PARAM_STR);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            // Handle error, misalnya log error atau throw exception lagi
+            // error_log("Error fetching outstanding invoices for {$supplier_name}: " . $e->getMessage());
+            // Untuk contoh ini, kita kembalikan array kosong jika ada error
+            return [];
+        }
+    }
+
+    /**
+     * Mengupdate jumlah yang sudah dibayar dan status pembayaran untuk faktur tertentu.
+     *
+     * @param int $invoice_id ID faktur pembelian yang akan diupdate.
+     * @param float $new_total_paid_for_invoice Jumlah total baru yang sudah dibayarkan untuk faktur ini.
+     * @param string $new_invoice_status Status pembayaran baru ('hutang', 'cicil', 'lunas').
+     * @return bool True jika update berhasil, false jika gagal.
+     */
+    public function updateInvoicePayment(int $invoice_id, float $new_total_paid_for_invoice, string $new_invoice_status): bool {
+        // Validasi status pembayaran (opsional, tapi baik untuk dilakukan)
+        $valid_statuses = ['hutang', 'cicil', 'lunas'];
+        if (!in_array($new_invoice_status, $valid_statuses)) {
+            // error_log("Invalid payment status '{$new_invoice_status}' for invoice ID {$invoice_id}.");
+            return false;
+        }
+
+        // Sebelum update, kita bisa juga memastikan status baru konsisten dengan jumlah pembayaran
+        // (Ini bisa juga dilakukan di logika bisnis sebelum memanggil metode ini)
+        // Misalnya, jika new_total_paid_for_invoice >= total_amount, maka new_invoice_status HARUS 'lunas'.
+        // Untuk contoh ini, kita percaya status yang diberikan sudah benar.
+
+        $sql = "UPDATE purchases 
+                SET 
+                    amount_already_paid = :amount_already_paid, 
+                    payment_status = :payment_status 
+                WHERE 
+                    purchase_id = :purchase_id";
+
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':amount_already_paid', $new_total_paid_for_invoice, PDO::PARAM_STR); // PDO::PARAM_STR cocok untuk DECIMAL/FLOAT juga
+            $stmt->bindParam(':payment_status', $new_invoice_status, PDO::PARAM_STR);
+            $stmt->bindParam(':purchase_id', $invoice_id, PDO::PARAM_INT);
+            
+            $stmt->execute();
+            
+            // Cek apakah ada baris yang terpengaruh (berhasil diupdate)
+            return $stmt->rowCount() > 0;
+        } catch (PDOException $e) {
+            // Handle error
+            // error_log("Error updating invoice ID {$invoice_id}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Anda mungkin memerlukan metode untuk mendapatkan total_amount faktur jika ingin
+    // menghitung status secara dinamis di dalam updateInvoicePayment
+    public function getInvoiceTotalAmount(int $invoice_id): ?float {
+        $sql = "SELECT total_amount FROM purchases WHERE purchase_id = :purchase_id";
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':purchase_id', $invoice_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? (float)$result['total_amount'] : null;
+        } catch (PDOException $e) {
+            // error_log("Error fetching total amount for invoice ID {$invoice_id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+
+    /**
+     * Mengupdate jumlah yang sudah dibayar untuk faktur tertentu.
+     * Status pembayaran akan dihitung ulang berdasarkan jumlah pembayaran baru dan total faktur.
+     *
+     * @param int $invoice_id ID faktur pembelian yang akan diupdate.
+     * @param float $new_total_paid_for_invoice Jumlah total baru yang sudah dibayarkan untuk faktur ini.
+     * @return bool True jika update berhasil, false jika gagal.
+     */
+    public function updateInvoicePaymentAndRecalculateStatus(int $invoice_id, float $new_total_paid_for_invoice): bool {
+        $total_amount = $this->getInvoiceTotalAmount($invoice_id);
+
+        if ($total_amount === null) {
+            // error_log("Could not retrieve total amount for invoice ID {$invoice_id} to recalculate status.");
+            return false; // Gagal mendapatkan total amount, tidak bisa lanjut
+        }
+
+        $new_invoice_status = '';
+        if ($new_total_paid_for_invoice >= $total_amount) {
+            $new_invoice_status = 'lunas';
+            // Pastikan amount_already_paid tidak melebihi total_amount jika ada kebijakan seperti itu
+            // $new_total_paid_for_invoice = $total_amount; // Opsional: batasi pembayaran maks = total tagihan
+        } elseif ($new_total_paid_for_invoice > 0 && $new_total_paid_for_invoice < $total_amount) {
+            $new_invoice_status = 'cicil';
+        } elseif ($new_total_paid_for_invoice <= 0) { // <= 0 karena bisa saja ada koreksi negatif
+            $new_invoice_status = 'hutang';
+            $new_total_paid_for_invoice = 0; // Pastikan tidak negatif
+        } else {
+             // Seharusnya tidak sampai sini jika logika di atas benar
+            // error_log("Unexpected condition when recalculating status for invoice ID {$invoice_id}.");
+            return false;
+        }
+
+        // Panggil metode update yang sudah ada
+        return $this->updateInvoicePayment($invoice_id, $new_total_paid_for_invoice, $new_invoice_status);
+    }
+
+}
+    
     /**
      * Fungsi untuk membuat nomor invoice
      * @return string Format invoice APT-YYYYMMDD-XXXX
