@@ -123,7 +123,39 @@ class Farmamedika
         }
     }
     
-    // Di dalam kelas Farmamedika
+    public function getAllProductsForDropdown() 
+    {
+        $stmt = $this->pdo->query("SELECT product_id, product_name, stock_quantity FROM products WHERE is_active = 1 ORDER BY product_name ASC");
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function getAllProductsPaginated($offset = 0, $limit = 10) {
+    try {
+        $pdo = $this->getPDO();
+        
+        $query = "
+            SELECT p.*, c.category_name, s.supplier_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.category_id
+            LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
+            ORDER BY p.product_name ASC
+            LIMIT :limit OFFSET :offset
+        ";
+        
+        $stmt = $pdo->prepare($query);
+        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        // Log error
+        error_log("Error getting paginated products: " . $e->getMessage());
+        return [];
+    }
+}
+    
+    
 
 /**
  * Menambahkan catatan pembayaran untuk sebuah pembelian dan memperbarui status pembelian.
@@ -183,15 +215,15 @@ public function addPurchasePayment($purchase_id, $data, $userId = null)
         $current_total_paid = (float)($paid_summary['total_paid_sum'] ?? 0);
 
         // 4. Tentukan status pembayaran baru
-        $new_payment_status = 'pending';
+        $new_payment_status = 'hutang';
         if ($current_total_paid >= $total_due_amount) {
-            $new_payment_status = 'paid';
+            $new_payment_status = 'lunas';
         } elseif ($current_total_paid > 0 && $current_total_paid < $total_due_amount) {
-            $new_payment_status = 'partially_paid';
+            $new_payment_status = 'cicil';
         }
         // Jika $current_total_paid <= 0, tetap 'pending' (kecuali jika total_due_amount juga 0)
         if ($total_due_amount == 0 && $current_total_paid == 0) { // Kasus khusus jika total tagihan 0
-             $new_payment_status = 'paid';
+             $new_payment_status = 'lunas';
         }
 
 
@@ -303,32 +335,6 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
         }
     }
 
-    /**
-     * Mendapatkan semua data produk
-     * @return array Daftar produk
-     */
-    
-    
-    /*public function getAllProducts()
-    {
-        try {
-            $query = "SELECT p.*, c.category_name, mt.type_name, pb.expiry_date
-                      FROM products p
-                      LEFT JOIN product_categories c ON p.category_id = c.category_id
-                      LEFT JOIN medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
-                      LEFT JOIN product_batches pb ON p.product_id = pb.product_id
-                      WHERE p.is_active = 1
-                      ORDER BY p.product_name";
-    
-            $stmt = $this->pdo->prepare($query);
-            $stmt->execute();
-    
-            return $stmt->fetchAll();
-        } catch (PDOException $e) {
-            error_log("Database Error (getAllProducts): " . $e->getMessage());
-            return [];
-        }
-    }*/
     
     public function getPurchases($startDate = null, $endDate = null) {
         try {
@@ -409,6 +415,59 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
         }
     }
     
+    // Di dalam class Farma Anda (atau sebagai fungsi global jika tidak menggunakan class)
+public function getProductsForPurchaseForm()
+{
+    try {
+        // Query ini mengambil produk beserta batch number dan expiry date
+        // dari batch yang paling cepat kedaluwarsa untuk setiap produk aktif.
+        // Jika ada beberapa batch dengan tanggal kedaluwarsa paling awal yang sama,
+        // maka akan dipilih berdasarkan created_at batch (yang paling baru dibuat).
+        // Jika tidak ada batch yang cocok, default_batch_number dan default_expiry_date akan NULL.
+        $query = "SELECT
+                    p.*,
+                    c.category_name,
+                    mt.type_name,
+                    (SELECT s_sub.supplier_name
+                     FROM product_batches pb_sub_supplier
+                     JOIN suppliers s_sub ON pb_sub_supplier.supplier_id = s_sub.supplier_id
+                     WHERE pb_sub_supplier.product_id = p.product_id
+                     -- AND pb_sub_supplier.remaining_quantity > 0 -- Opsional: hanya batch dengan stok
+                     ORDER BY pb_sub_supplier.expiry_date ASC, pb_sub_supplier.created_at DESC
+                     LIMIT 1) AS supplier_name_from_batch, -- Supplier dari batch spesifik tersebut
+                    (SELECT pb_sub.expiry_date
+                     FROM product_batches pb_sub
+                     WHERE pb_sub.product_id = p.product_id
+                     -- AND pb_sub.remaining_quantity > 0 -- Opsional: hanya batch dengan stok
+                     ORDER BY pb_sub.expiry_date ASC, pb_sub.created_at DESC
+                     LIMIT 1) AS default_expiry_date,
+                    (SELECT pb_sub.batch_number
+                     FROM product_batches pb_sub
+                     WHERE pb_sub.product_id = p.product_id
+                     -- AND pb_sub.remaining_quantity > 0 -- Opsional: hanya batch dengan stok
+                     ORDER BY pb_sub.expiry_date ASC, pb_sub.created_at DESC
+                     LIMIT 1) AS default_batch_number
+                  FROM
+                    products p
+                  LEFT JOIN
+                    product_categories c ON p.category_id = c.category_id
+                  LEFT JOIN
+                    medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
+                  WHERE
+                    p.is_active = 1
+                  ORDER BY
+                    p.product_name ASC";
+
+        $stmt = $this->pdo->prepare($query);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database Error (getProductsForPurchaseForm): " . $e->getMessage());
+        return []; // Kembalikan array kosong jika ada error
+    }
+}
+    
     public function getAllProducts()
     {
         try {
@@ -445,6 +504,61 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
             return [];
         }
     }
+    
+    // Asumsikan class dan koneksi PDO ($this->pdo) sudah ada
+    
+    /*public function getAllProducts()
+    {
+        try {
+            // Query dimodifikasi untuk mengambil nama unit dasar dan sub-unit penjualan
+            $query = "SELECT 
+                        p.*,  -- Ini akan menyertakan p.price, p.stock_quantity, 
+                              -- p.base_unit_id, p.sub_sales_unit_id, 
+                              -- dan p.sub_sales_unit_conversion_factor
+                        c.category_name, 
+                        mt.type_name,
+                        pb.expiry_date,
+                        pb.batch_number,
+                        s.supplier_name,
+                        bu.unit_name AS base_unit_name,          -- Nama untuk unit dasar
+                        ssu.unit_name AS sub_sales_unit_name     -- Nama untuk sub-unit penjualan (bisa NULL)
+                      FROM 
+                        products p
+                      LEFT JOIN 
+                        product_categories c ON p.category_id = c.category_id
+                      LEFT JOIN 
+                        medicine_types mt ON p.medicine_type_id = mt.medicine_type_id
+                      LEFT JOIN 
+                        product_batches pb ON p.product_id = pb.product_id 
+                      LEFT JOIN 
+                        suppliers s ON pb.supplier_id = s.supplier_id
+                      JOIN                                       -- JOIN karena base_unit_id wajib ada
+                        units bu ON p.base_unit_id = bu.unit_id
+                      LEFT JOIN                                  -- LEFT JOIN karena sub_sales_unit_id bisa NULL
+                        units ssu ON p.sub_sales_unit_id = ssu.unit_id
+                      WHERE 
+                        p.is_active = 1
+                      GROUP BY 
+                        p.product_id 
+                      ORDER BY 
+                        p.product_name";
+    
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute();
+    
+            // Data yang dikembalikan akan mencakup field-field baru:
+            // base_unit_name
+            // sub_sales_unit_name (bisa null)
+            // p.sub_sales_unit_conversion_factor (sudah termasuk dalam p.*)
+            // p.price (adalah harga per base_unit)
+            // p.stock_quantity (adalah stok dalam base_unit)
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Database Error (getAllProducts): " . $e->getMessage());
+            return [];
+        }
+    }*/
+
 
     public function getProductsByCategory($categoryId)
     {
@@ -737,7 +851,7 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
         }
     }
 
-    public function savePharmacyTransaction($data)
+    /*public function savePharmacyTransaction($data)
     {
         try {
     
@@ -832,6 +946,130 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
                 $this->pdo->rollBack();
             }
             error_log("Transaction Error: " . $e->getMessage());
+    
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }*/
+    
+    public function savePharmacyTransaction($data)
+    {
+        try {
+    
+            // Ambil user ID dari sesi
+            $userId = $_SESSION['user_id'] ?? null;
+    
+            if (!$userId) {
+                throw new Exception("User tidak terautentikasi.");
+            }
+    
+            $this->pdo->beginTransaction();
+    
+            // Generate invoice number
+            $invoiceNumber = $this->generateInvoiceNumber($userId);
+    
+            // Insert sale header
+            $stmtHeader = $this->pdo->prepare("
+                INSERT INTO sales (
+                    invoice_number, customer_name, doctor_id, prescription_number, user_id, 
+                    subtotal, tax_amount, discount_amount, total_amount, payment_method_id, 
+                    payment_status, notes, sale_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+    
+            $stmtHeader->execute([
+                $invoiceNumber,
+                $data['customer_name'],
+                $data['doctor_id'],
+                $data['prescription_number'],
+                $userId, // Simpan user ID dari sesi
+                $data['subtotal'],
+                $data['tax_amount'],
+                $data['discount_amount'],
+                $data['total_amount'],
+                $data['payment_method_id'],
+                $data['payment_status'],
+                $data['notes'],
+            ]);
+    
+            $saleId = $this->pdo->lastInsertId();
+    
+            foreach ($data['items'] as $item) {
+                $stmtProduct = $this->pdo->prepare("
+                    SELECT product_id, stock_quantity, price 
+                    FROM products 
+                    WHERE product_id = ? 
+                    FOR UPDATE
+                ");
+                $stmtProduct->execute([$item['product_id']]);
+                $product = $stmtProduct->fetch(PDO::FETCH_ASSOC);
+    
+                if (!$product) {
+                    throw new Exception("Produk dengan ID {$item['product_id']} tidak ditemukan");
+                }
+    
+                // $item['quantity'] is the actual_quantity in base units from cashier.js
+                if ($product['stock_quantity'] < $item['quantity']) {
+                    throw new Exception("Stok tidak mencukupi untuk produk ID: {$item['product_id']} (Stok: {$product['stock_quantity']}, Diminta: {$item['quantity']})");
+                }
+    
+                $batch_id = null; // Assuming batch_id is handled or null for now
+    
+                $discountPercent = $item['discount_percent'] ?? 0;
+                
+                // Use total_price_rounded from frontend as it includes rounding logic
+                // If not provided, you might fall back to recalculating, but ensure rounding matches.
+                $itemTotal = $item['total_price_rounded'] ?? ($item['quantity'] * $item['unit_price'] * (1 - $discountPercent / 100));
+    
+                // Get the new fields from the item data
+                $selected_unit = $item['selected_unit'] ?? null;
+                $display_quantity = $item['display_quantity'] ?? $item['quantity']; // Fallback display_quantity to actual_quantity if not sent
+    
+                $stmtItem = $this->pdo->prepare("
+                    INSERT INTO sale_items (
+                        sale_id, product_id, batch_id, 
+                        quantity, display_quantity, selected_unit, -- Added display_quantity and selected_unit
+                        unit_price, discount_percent, item_total
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) -- Adjusted placeholder count
+                ");
+    
+                $stmtItem->execute([
+                    $saleId, 
+                    $item['product_id'], 
+                    $batch_id, 
+                    $item['quantity'],         // Actual quantity in base units
+                    $display_quantity,       // Quantity as seen by user
+                    $selected_unit,          // Unit selected by user
+                    $item['unit_price'],       // Price per base unit
+                    $discountPercent,
+                    $itemTotal                 // Total for this item line (rounded from frontend)
+                ]);
+    
+                $stmtUpdateStock = $this->pdo->prepare("
+                    UPDATE products 
+                    SET stock_quantity = stock_quantity - ? 
+                    WHERE product_id = ?
+                ");
+                // $item['quantity'] is already the actual quantity in base units for stock deduction
+                $stmtUpdateStock->execute([$item['quantity'], $item['product_id']]);
+            }
+    
+            $this->pdo->commit();
+    
+            return [
+                'success' => true,
+                'sale_id' => $saleId,
+                'invoice_number' => $invoiceNumber,
+                'message' => 'Transaksi berhasil disimpan',
+            ];
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log("Transaction Error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+    
     
             return [
                 'success' => false,
@@ -1364,7 +1602,7 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
     
     public function daysUntilExpire($expire_date) 
     {
-        $current_date = date('d-m-Y'); // Tanggal hari ini
+        $current_date = date('Y-m-d'); // Tanggal hari ini
 
         // Menghitung selisih antara tanggal sekarang dan tanggal expired
         $expire_timestamp = strtotime($expire_date);
@@ -1506,27 +1744,186 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
         return $report;
     }
     
+    // Di dalam kelas Farmamedika
+
     /**
-     * Mengambil ringkasan pemasukan historis yang diagregasi per hari.
-     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
-     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
-     * @return array Daftar ringkasan pemasukan per hari
+     * Menambahkan catatan pengeluaran operasional baru.
+     * @param array $data Data pengeluaran (expense_date, description, category, amount, user_id)
+     * @return array Hasil operasi (success, message, expense_id)
      */
-    public function getHistoricalIncomeSummary($startDate, $endDate)
+    public function addOperationalExpense($data)
     {
         if (!$this->pdo) {
-            error_log("getHistoricalIncomeSummary Error: No valid PDO connection.");
+            error_log("addOperationalExpense Error: No valid PDO connection.");
+            return ['success' => false, 'message' => 'Koneksi database gagal.'];
+        }
+    
+        // Validasi data dasar
+        if (empty($data['expense_date']) || empty($data['description']) || !isset($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
+            return ['success' => false, 'message' => 'Tanggal, deskripsi, dan jumlah (harus angka > 0) wajib diisi.'];
+        }
+    
+        try {
+            $sql = "INSERT INTO operational_expenses (expense_date, description, category, amount, user_id, created_at, updated_at)
+                    VALUES (:expense_date, :description, :category, :amount, :user_id, NOW(), NOW())";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':expense_date', $data['expense_date']);
+            $stmt->bindParam(':description', $data['description']);
+            $stmt->bindParam(':category', $data['category']); // Bisa null jika tidak diisi
+            $stmt->bindParam(':amount', $data['amount']);
+            $stmt->bindParam(':user_id', $data['user_id'], PDO::PARAM_INT); // Bisa null
+            
+            $stmt->execute();
+            $expense_id = $this->pdo->lastInsertId();
+    
+            if ($data['user_id']) {
+                 $this->logActivity($data['user_id'], 'ADD_OPERATIONAL_EXPENSE', "Pengeluaran operasional '{$data['description']}' Rp {$data['amount']} ditambahkan.");
+            }
+    
+            return ['success' => true, 'message' => 'Pengeluaran operasional berhasil ditambahkan.', 'expense_id' => $expense_id];
+    
+        } catch (PDOException $e) {
+            error_log("PDO Error (addOperationalExpense): " . $e->getMessage());
+            return ['success' => false, 'message' => 'Gagal menambahkan pengeluaran operasional: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Mengambil total pengeluaran operasional per hari dalam rentang tanggal.
+     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
+     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
+     * @return array Daftar total pengeluaran operasional per hari
+     */
+    public function getAggregatedOperationalExpenses($startDate, $endDate)
+    {
+        if (!$this->pdo) {
+            error_log("getAggregatedOperationalExpenses Error: No valid PDO connection.");
+            return [];
+        }
+        try {
+            $sql = "SELECT 
+                        expense_date, 
+                        SUM(amount) as total_daily_operational_expense
+                    FROM operational_expenses
+                    WHERE expense_date BETWEEN :startDate AND :endDate
+                    GROUP BY expense_date
+                    ORDER BY expense_date ASC";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':startDate', $startDate);
+            $stmt->bindParam(':endDate', $endDate);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // Kunci adalah tanggal, nilai adalah total
+        } catch (PDOException $e) {
+            error_log("PDO Error (getAggregatedOperationalExpenses): " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Mengambil total pembayaran pembelian per hari dalam rentang tanggal.
+     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
+     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
+     * @return array Daftar total pembayaran pembelian per hari
+     */
+    public function getAggregatedPurchasePayments($startDate, $endDate)
+    {
+        if (!$this->pdo) {
+            error_log("getAggregatedPurchasePayments Error: No valid PDO connection.");
+            return [];
+        }
+        try {
+            $sql = "SELECT 
+                        DATE(payment_date) as payment_day, 
+                        SUM(amount_paid) as total_daily_purchase_payment
+                    FROM purchase_payments
+                    WHERE DATE(payment_date) BETWEEN :startDate AND :endDate
+                    GROUP BY DATE(payment_date)
+                    ORDER BY DATE(payment_date) ASC";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':startDate', $startDate);
+            $stmt->bindParam(':endDate', $endDate);
+            $stmt->execute();
+            // Menggunakan FETCH_KEY_PAIR agar mudah di-lookup berdasarkan tanggal
+            return $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        } catch (PDOException $e) {
+            error_log("PDO Error (getAggregatedPurchasePayments): " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Mengambil rincian semua pengeluaran operasional dalam rentang tanggal tertentu.
+     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
+     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
+     * @return array Daftar detail pengeluaran operasional
+     */
+    public function getOperationalExpenseDetailsInRange($startDate, $endDate)
+    {
+        if (!$this->pdo) {
+            error_log("getOperationalExpenseDetailsInRange Error: No valid PDO connection.");
+            return ['data' => [], 'error' => 'Koneksi database gagal.'];
+        }
+    
+        $result = ['data' => [], 'error' => null];
+    
+        try {
+            $sql = "SELECT 
+                        expense_id,
+                        expense_date, 
+                        description, 
+                        category, 
+                        amount,
+                        u.name as recorded_by_user -- Mengambil nama user yang mencatat
+                    FROM operational_expenses oe
+                    LEFT JOIN users u ON oe.user_id = u.user_id -- Join dengan tabel users
+                    WHERE oe.expense_date BETWEEN :startDate AND :endDate
+                    ORDER BY oe.expense_date DESC, oe.created_at DESC";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':startDate', $startDate);
+            $stmt->bindParam(':endDate', $endDate);
+            $stmt->execute();
+            $result['data'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+        } catch (PDOException $e) {
+            error_log("PDO Error (getOperationalExpenseDetailsInRange from {$startDate} to {$endDate}): " . $e->getMessage());
+            $result['error'] = 'Gagal mengambil rincian pengeluaran operasional: ' . $e->getMessage();
+        }
+        return $result;
+    }
+
+    /**
+     * Mengambil ringkasan pendapatan dan pengeluaran historis yang diagregasi per hari.
+     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
+     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
+     * @return array Daftar ringkasan per hari
+     */
+    /*public function getHistoricalFinancialSummary($startDate, $endDate) // Nama fungsi diubah agar lebih deskriptif
+    {
+        if (!$this->pdo) {
+            error_log("getHistoricalFinancialSummary Error: No valid PDO connection.");
             return ['data' => [], 'error' => 'Koneksi database gagal.'];
         }
     
         $summary = ['data' => [], 'error' => null];
     
         try {
-            $sql = "SELECT
+            // CTE untuk mendapatkan semua tanggal unik dari semua sumber
+            // dan kemudian LEFT JOIN ke data yang diagregasi.
+            $sql = "
+                WITH RelevantDates AS (
+                    SELECT DISTINCT DATE(s.sale_date) as event_date FROM sales s WHERE DATE(s.sale_date) BETWEEN :startDate AND :endDate
+                    UNION
+                    SELECT DISTINCT DATE(pp.payment_date) as event_date FROM purchase_payments pp WHERE DATE(pp.payment_date) BETWEEN :startDate AND :endDate
+                    UNION
+                    SELECT DISTINCT oe.expense_date as event_date FROM operational_expenses oe WHERE oe.expense_date BETWEEN :startDate AND :endDate
+                ),
+                DailySales AS (
+                    SELECT
                         DATE(s.sale_date) as sale_day,
                         SUM(s.total_amount) as daily_revenue,
-                        SUM(si.quantity * p.cost_price) as daily_cogs, /* Menggunakan cost_price */
-                        (SUM(s.total_amount) - SUM(si.quantity * p.cost_price)) as daily_net_profit
+                        SUM(si.quantity * p.cost_price) as daily_cogs
                     FROM
                         sales s
                     JOIN
@@ -1537,17 +1934,156 @@ public function getPurchaseWithPaymentSummary($purchase_id) {
                         DATE(s.sale_date) BETWEEN :startDate AND :endDate
                     GROUP BY
                         DATE(s.sale_date)
-                    ORDER BY
-                        sale_day DESC"; // Urutkan dari tanggal terbaru
+                ),
+                DailyPurchasePayments AS (
+                    SELECT
+                        DATE(payment_date) as payment_day,
+                        SUM(amount_paid) as daily_purchase_outflow
+                    FROM
+                        purchase_payments
+                    WHERE
+                        DATE(payment_date) BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        DATE(payment_date)
+                ),
+                DailyOperationalExpenses AS (
+                    SELECT
+                        expense_date,
+                        SUM(amount) as daily_operational_outflow
+                    FROM
+                        operational_expenses
+                    WHERE
+                        expense_date BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        expense_date
+                )
+                SELECT
+                    rd.event_date,
+                    COALESCE(ds.daily_revenue, 0) as daily_revenue,
+                    COALESCE(ds.daily_cogs, 0) as daily_cogs,
+                    COALESCE(dpp.daily_purchase_outflow, 0) as daily_purchase_payments,
+                    COALESCE(doe.daily_operational_outflow, 0) as daily_operational_expenses,
+                    (COALESCE(ds.daily_revenue, 0) - COALESCE(ds.daily_cogs, 0) - COALESCE(doe.daily_operational_outflow, 0)) as daily_net_profit
+                FROM
+                    RelevantDates rd
+                LEFT JOIN DailySales ds ON rd.event_date = ds.sale_day
+                LEFT JOIN DailyPurchasePayments dpp ON rd.event_date = dpp.payment_day
+                LEFT JOIN DailyOperationalExpenses doe ON rd.event_date = doe.expense_date
+                WHERE rd.event_date IS NOT NULL -- Memastikan hanya tanggal yang ada data yang muncul
+                ORDER BY
+                    rd.event_date DESC";
     
             $stmt = $this->pdo->prepare($sql);
             $stmt->bindParam(':startDate', $startDate);
             $stmt->bindParam(':endDate', $endDate);
+            // Bind :startDate dan :endDate untuk setiap CTE juga jika diperlukan oleh driver DB tertentu,
+            // namun untuk MySQL, parameter yang sama bisa digunakan berulang kali.
+            // Jika ada masalah, Anda mungkin perlu bind parameter dengan nama unik untuk setiap penggunaan.
+            
             $stmt->execute();
             $summary['data'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
         } catch (PDOException $e) {
-            error_log("PDO Error (getHistoricalIncomeSummary from {$startDate} to {$endDate}): " . $e->getMessage());
+            error_log("PDO Error (getHistoricalFinancialSummary from {$startDate} to {$endDate}): " . $e->getMessage());
+            $summary['error'] = 'Gagal mengambil data laporan historis: ' . $e->getMessage();
+        }
+        return $summary;
+    }*/
+    
+    public function getHistoricalFinancialSummary($startDate, $endDate)
+    {
+        if (!$this->pdo) {
+            error_log("getHistoricalFinancialSummary Error: No valid PDO connection.");
+            return ['data' => [], 'error' => 'Koneksi database gagal.'];
+        }
+    
+        $summary = ['data' => [], 'error' => null];
+    
+        try {
+            // Patch: Pisahkan DailySales dan DailyCOGS agar SUM total_amount tidak ikut join ke sale_items
+            $sql = "
+                WITH RelevantDates AS (
+                    SELECT DISTINCT DATE(s.sale_date) as event_date FROM sales s WHERE DATE(s.sale_date) BETWEEN :startDate AND :endDate
+                    UNION
+                    SELECT DISTINCT DATE(pp.payment_date) as event_date FROM purchase_payments pp WHERE DATE(pp.payment_date) BETWEEN :startDate AND :endDate
+                    UNION
+                    SELECT DISTINCT oe.expense_date as event_date FROM operational_expenses oe WHERE oe.expense_date BETWEEN :startDate AND :endDate
+                ),
+                DailySales AS (
+                    SELECT
+                        DATE(s.sale_date) as sale_day,
+                        SUM(s.total_amount) as daily_revenue
+                    FROM
+                        sales s
+                    WHERE
+                        DATE(s.sale_date) BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        DATE(s.sale_date)
+                ),
+                DailyCOGS AS (
+                    SELECT
+                        DATE(s.sale_date) as sale_day,
+                        SUM(si.quantity * p.cost_price) as daily_cogs
+                    FROM
+                        sales s
+                    JOIN
+                        sale_items si ON s.sale_id = si.sale_id
+                    JOIN
+                        products p ON si.product_id = p.product_id
+                    WHERE
+                        DATE(s.sale_date) BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        DATE(s.sale_date)
+                ),
+                DailyPurchasePayments AS (
+                    SELECT
+                        DATE(payment_date) as payment_day,
+                        SUM(amount_paid) as daily_purchase_outflow
+                    FROM
+                        purchase_payments
+                    WHERE
+                        DATE(payment_date) BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        DATE(payment_date)
+                ),
+                DailyOperationalExpenses AS (
+                    SELECT
+                        expense_date,
+                        SUM(amount) as daily_operational_outflow
+                    FROM
+                        operational_expenses
+                    WHERE
+                        expense_date BETWEEN :startDate AND :endDate
+                    GROUP BY
+                        expense_date
+                )
+                SELECT
+                    rd.event_date,
+                    COALESCE(ds.daily_revenue, 0) as daily_revenue,
+                    COALESCE(dc.daily_cogs, 0) as daily_cogs,
+                    COALESCE(dpp.daily_purchase_outflow, 0) as daily_purchase_payments,
+                    COALESCE(doe.daily_operational_outflow, 0) as daily_operational_expenses,
+                    (COALESCE(ds.daily_revenue, 0) - COALESCE(dc.daily_cogs, 0) - COALESCE(doe.daily_operational_outflow, 0)) as daily_net_profit
+                FROM
+                    RelevantDates rd
+                LEFT JOIN DailySales ds ON rd.event_date = ds.sale_day
+                LEFT JOIN DailyCOGS dc ON rd.event_date = dc.sale_day
+                LEFT JOIN DailyPurchasePayments dpp ON rd.event_date = dpp.payment_day
+                LEFT JOIN DailyOperationalExpenses doe ON rd.event_date = doe.expense_date
+                WHERE rd.event_date IS NOT NULL
+                ORDER BY
+                    rd.event_date DESC
+            ";
+    
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':startDate', $startDate);
+            $stmt->bindParam(':endDate', $endDate);
+    
+            $stmt->execute();
+            $summary['data'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+        } catch (PDOException $e) {
+            error_log("PDO Error (getHistoricalFinancialSummary from {$startDate} to {$endDate}): " . $e->getMessage());
             $summary['error'] = 'Gagal mengambil data laporan historis: ' . $e->getMessage();
         }
         return $summary;
