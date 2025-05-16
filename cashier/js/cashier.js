@@ -48,51 +48,60 @@ function updateCartSummary() {
     }
 }
 
+// Variabel global untuk melacak indeks item yang aktif di dropdown
+let activeDropdownItemIndex = -1; // -1 berarti tidak ada yang aktif
+
 function renderManualSearchResults(products) {
     const resultsContainer = $('#search-results-container');
-    resultsContainer.empty(); // Kosongkan hasil sebelumnya
+    resultsContainer.empty();
+    activeDropdownItemIndex = -1; // Reset item aktif setiap kali hasil baru dirender
 
     if (products.length === 0) {
-        // Tetap tampilkan pesan jika tidak ada produk, tapi dengan styling list item
-        resultsContainer.html('<div class="search-result-item text-gray-500">Produk tidak ditemukan.</div>');
+        resultsContainer.html('<div class="search-result-item p-3 text-gray-500">Produk tidak ditemukan.</div>');
         resultsContainer.removeClass('hidden');
         return;
     }
 
-    products.forEach(product => {
-        // Sesuaikan properti produk dengan data dari backend Anda
-        const productName = product.product_name || 'Nama Produk Tidak Ada';
-        // Coba beberapa kemungkinan nama field harga dari respons AJAX Anda
-        const productPrice = parseFloat(product.price || product.selling_price || product.harga_jual || 0); 
-        const itemCode = product.kode_item || product.item_code || ''; // Coba beberapa nama field kode
-        const unitName = product.unit || product.unit_name || 'Pcs'; // Coba beberapa nama field unit
+    products.forEach((product, index) => { // Tambahkan 'index' di sini
+        const productName = product.product_name || 'N/A';
+        const productPrice = parseFloat(product.price || product.selling_price || 0);
+        const itemCode = product.kode_item || product.item_code || '';
+        const unitName = product.unit || product.unit_name || 'Pcs';
 
-        // Membuat elemen list sederhana untuk setiap produk
+        // Tambahkan data-index ke elemen untuk identifikasi
         const resultItemHTML = `
-            <div class="search-result-item p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0">
-                <div class="font-semibold text-sm">${productName}</div>
+            <div class="search-result-item p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0" data-index="${index}">
+                <div class="font-semibold text-md">${productName}</div>
                 <div class="text-xs text-gray-600 flex justify-between items-center mt-0.5">
                     <span>${itemCode ? `Kode: ${itemCode}` : ''}</span>
                     <span class="text-blue-600 font-medium">Rp ${productPrice.toLocaleString('id-ID')} / ${unitName}</span>
                 </div>
             </div>
         `;
-        
         const resultItem = $(resultItemHTML);
 
         resultItem.on('click', function() {
-            addProductToCart(product, 1); // Fungsi Anda untuk menambah ke keranjang
-            $('#product-search').val(''); // Kosongkan input pencarian
-            resultsContainer.empty().addClass('hidden'); // Sembunyikan hasil pencarian
-            $('#product-search').focus(); // Fokus kembali ke input (opsional)
+            addProductToCart(product, 1);
+            $('#product-search').val('');
+            resultsContainer.empty().addClass('hidden');
+            activeDropdownItemIndex = -1; // Reset
+            $('#product-search').focus();
         });
+
+        // Tambahkan event listener untuk mouse hover untuk menyinkronkan dengan keyboard
+        resultItem.on('mouseenter', function() {
+            // Hapus highlight dari item lain
+            resultsContainer.find('.search-result-item.active').removeClass('active bg-blue-100'); // Hapus class 'active' dan style highlight
+            // Tambah highlight ke item ini
+            $(this).addClass('active bg-blue-100'); // Tambah class 'active' dan style highlight
+            activeDropdownItemIndex = parseInt($(this).data('index'));
+        });
+
         resultsContainer.append(resultItem);
     });
 
     if (products.length > 0) {
-        resultsContainer.removeClass('hidden'); // Tampilkan kontainer jika ada hasil
-    } else {
-        resultsContainer.addClass('hidden'); // Sembunyikan jika tidak (meskipun sudah ditangani di awal)
+        resultsContainer.removeClass('hidden');
     }
 }
 
@@ -164,8 +173,6 @@ function renderCartItems() {
         updateCartSummary();
     });
 }
-
-
 
 
 // Fungsi untuk menambah produk ke keranjang
@@ -273,9 +280,13 @@ function loadProductsByCategory(categoryId) {
 let searchTimeout;
 function searchProducts(keyword, isBarcode = false) {
     if (searchTimeout) clearTimeout(searchTimeout);
-    if (keyword.length === 0) {
-        $('.category-btn[data-id="0"]').click(); 
-        return;
+    // Tambahkan pengecekan ini di awal untuk pencarian manual
+    if (!isBarcode && keyword.length === 0) {
+        $('#search-results-container').empty().addClass('hidden'); // Sembunyikan dropdown
+        activeDropdownItemIndex = -1;
+        // Opsional: Panggil fungsi untuk menampilkan kategori default di grid bawah jika diinginkan
+        // $('.category-btn[data-id="0"]').click(); 
+        return; // Jangan lanjutkan dengan AJAX jika keyword kosong untuk pencarian manual
     }
     if (keyword.length < 2 && !isBarcode) return; 
     const delay = isBarcode ? 0 : 300; 
@@ -686,9 +697,11 @@ $(document).ready(function() {
         if (keyword.length === 0) {
             resultsContainer.empty().addClass('hidden'); 
             $('#clear-search').hide();
+            activeDropdownItemIndex = -1;
             // JANGAN panggil fungsi yang mengisi #products-container (grid bawah) di sini
             return;
         }
+        
 
         if (keyword.length < 2) { 
             resultsContainer.empty().addClass('hidden'); // Atau tampilkan pesan "ketik lagi"
