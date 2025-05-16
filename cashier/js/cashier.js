@@ -48,6 +48,54 @@ function updateCartSummary() {
     }
 }
 
+function renderManualSearchResults(products) {
+    const resultsContainer = $('#search-results-container');
+    resultsContainer.empty(); // Kosongkan hasil sebelumnya
+
+    if (products.length === 0) {
+        // Tetap tampilkan pesan jika tidak ada produk, tapi dengan styling list item
+        resultsContainer.html('<div class="search-result-item text-gray-500">Produk tidak ditemukan.</div>');
+        resultsContainer.removeClass('hidden');
+        return;
+    }
+
+    products.forEach(product => {
+        // Sesuaikan properti produk dengan data dari backend Anda
+        const productName = product.product_name || 'Nama Produk Tidak Ada';
+        // Coba beberapa kemungkinan nama field harga dari respons AJAX Anda
+        const productPrice = parseFloat(product.price || product.selling_price || product.harga_jual || 0); 
+        const itemCode = product.kode_item || product.item_code || ''; // Coba beberapa nama field kode
+        const unitName = product.unit || product.unit_name || 'Pcs'; // Coba beberapa nama field unit
+
+        // Membuat elemen list sederhana untuk setiap produk
+        const resultItemHTML = `
+            <div class="search-result-item p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0">
+                <div class="font-semibold text-sm">${productName}</div>
+                <div class="text-xs text-gray-600 flex justify-between items-center mt-0.5">
+                    <span>${itemCode ? `Kode: ${itemCode}` : ''}</span>
+                    <span class="text-blue-600 font-medium">Rp ${productPrice.toLocaleString('id-ID')} / ${unitName}</span>
+                </div>
+            </div>
+        `;
+        
+        const resultItem = $(resultItemHTML);
+
+        resultItem.on('click', function() {
+            addProductToCart(product, 1); // Fungsi Anda untuk menambah ke keranjang
+            $('#product-search').val(''); // Kosongkan input pencarian
+            resultsContainer.empty().addClass('hidden'); // Sembunyikan hasil pencarian
+            $('#product-search').focus(); // Fokus kembali ke input (opsional)
+        });
+        resultsContainer.append(resultItem);
+    });
+
+    if (products.length > 0) {
+        resultsContainer.removeClass('hidden'); // Tampilkan kontainer jika ada hasil
+    } else {
+        resultsContainer.addClass('hidden'); // Sembunyikan jika tidak (meskipun sudah ditangani di awal)
+    }
+}
+
 // Render cart items
 function renderCartItems() {
     if (cartItems.length === 0) {
@@ -116,6 +164,8 @@ function renderCartItems() {
         updateCartSummary();
     });
 }
+
+
 
 
 // Fungsi untuk menambah produk ke keranjang
@@ -230,32 +280,41 @@ function searchProducts(keyword, isBarcode = false) {
     if (keyword.length < 2 && !isBarcode) return; 
     const delay = isBarcode ? 0 : 300; 
     searchTimeout = setTimeout(function() {
-        $.ajax({
-            url: 'ajax_search_products.php',
-            type: 'GET',
-            data: { keyword: keyword, is_barcode: isBarcode ? 1 : 0 },
-            dataType: 'json',
-            success: function(response) {
-                if (Array.isArray(response)) {
-                    if (isBarcode && response.length === 1) {
-                        addProductToCart(response[0], 1); 
+            $.ajax({
+                url: 'ajax_search_products.php',
+                type: 'GET',
+                data: { keyword: keyword, is_barcode: isBarcode ? 1 : 0 },
+                dataType: 'json',
+                success: function(response) {
+                    const searchInput = $('#product-search');
+                    const dropdownResultsContainer = $('#search-results-container'); // Untuk dropdown
+                    // const gridProductsContainer = $('#products-container'); // Untuk grid produk umum di bawah
+
+                    if (Array.isArray(response)) {
+                        if (isBarcode && response.length === 1) {
+                            addProductToCart(response[0], 1);
+                            searchInput.val('').focus();
+                            dropdownResultsContainer.empty().addClass('hidden'); // Kosongkan dropdown
+                        } else if (isBarcode && response.length !== 1) {
+                            Swal.fire({ /* ... */ });
+                            searchInput.val(keyword).focus().select();
+                            dropdownResultsContainer.empty().addClass('hidden'); // Kosongkan dropdown
+                        } else if (!isBarcode) { 
+                            // PENCARIAN MANUAL: Render ke dropdown container
+                            renderManualSearchResults(response); 
+                            // JANGAN render ke gridProductsContainer di sini untuk hasil search manual
+                        }
                     } else {
-                        renderProducts(response);
+                        // Error handling
+                        if (!isBarcode) { dropdownResultsContainer.empty().addClass('hidden'); }
                     }
-                } else if (response.error) {
-                    console.error('Error from server during search:', response.error);
-                    renderProducts([]); 
-                } else {
-                    console.error('Invalid response format from search:', response);
-                    renderProducts([]);
+                },
+                error: function(xhr, status, error) {
+                    // Error handling
+                    if (!isBarcode) { $('#search-results-container').empty().addClass('hidden'); }
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error searching products:', error);
-                renderProducts([]); 
-            }
-        });
-    }, delay);
+            });
+        }, delay);
 }
 
 // Render products in grid
@@ -622,11 +681,23 @@ $(document).ready(function() {
     
     $('#product-search').on('input', function() {
         const keyword = $(this).val().trim();
-        if (!isBarcodeScanning) { 
-            searchProducts(keyword, false);
+        const resultsContainer = $('#search-results-container'); // TARGET UNTUK DROPDOWN
+
+        if (keyword.length === 0) {
+            resultsContainer.empty().addClass('hidden'); 
+            $('#clear-search').hide();
+            // JANGAN panggil fungsi yang mengisi #products-container (grid bawah) di sini
+            return;
         }
-        if (keyword.length > 0) $('#clear-search').show();
-        else $('#clear-search').hide();
+
+        if (keyword.length < 2) { 
+            resultsContainer.empty().addClass('hidden'); // Atau tampilkan pesan "ketik lagi"
+            $('#clear-search').show();
+            return;
+        }
+        
+        $('#clear-search').show();
+        searchProducts(keyword, false); // isBarcode = false untuk pencarian manual
     });
     
     $('#clear-search').click(function() {
