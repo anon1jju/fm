@@ -61,40 +61,46 @@ function renderCartItems() {
     }
     let html = '';
     cartItems.forEach((item, index) => {
-        let unitSelectorHtml = '<div class="unit-selector-group text-xs mt-1" data-index="' + index + '">';
-        unitSelectorHtml += '<span class="text-gray-600 mr-1 font-medium">Unit:</span>';
-        const baseUnitOriginalCase = item.unit;
+        let unitSelectorHtml = '<div class="unit-selector-group text-sm mt-1" data-index="' + index + '">';
+        unitSelectorHtml += '<span class="text-gray-700 mr-1 font-medium"></span>';
+        const baseUnitOriginalCase = item.unit; 
         const selectedUnit = item.selected_unit || baseUnitOriginalCase;
 
         if (baseUnitOriginalCase && baseUnitOriginalCase.toLowerCase() === 'strip') {
-            const optionStrip = baseUnitOriginalCase;
-            const optionPcs = "Tablet";
-            unitSelectorHtml += `<label class="mr-2 cursor-pointer"><input type="radio" name="unit-options-${index}" value="${optionStrip}" class="unit-radio mr-0.5" data-item-index="${index}" ${ selectedUnit === optionStrip ? 'checked' : ''}> ${optionStrip}</label>`;
-            unitSelectorHtml += `<label class="mr-2 cursor-pointer"><input type="radio" name="unit-options-${index}" value="${optionPcs}" class="unit-radio mr-0.5" data-item-index="${index}" ${ selectedUnit === optionPcs ? 'checked' : ''}> ${optionPcs}</label>`;
+            const optionStrip = baseUnitOriginalCase; 
+            const optionPcs = "Tablet"; 
+            unitSelectorHtml += `<label class="mr-2 cursor-pointer"><input type="radio" name="unit-options-${index}" value="${optionStrip}" class="unit-radio mr-0.5" data-item-index="${index}" ${ selectedUnit.toLowerCase() === optionStrip.toLowerCase() ? 'checked' : '' }>${optionStrip}</label>`;
+            unitSelectorHtml += `<label class="mr-2 cursor-pointer"><input type="radio" name="unit-options-${index}" value="${optionPcs}" class="unit-radio mr-0.5" data-item-index="${index}" ${ selectedUnit.toLowerCase() === optionPcs.toLowerCase() ? 'checked' : '' }>${optionPcs}</label>`;
         } else {
-            const displayUnit = baseUnitOriginalCase || 'N/A';
-            unitSelectorHtml += `<label class="mr-2 cursor-pointer"><input type="radio" name="unit-options-${index}" value="${displayUnit}" class="unit-radio mr-0.5" data-item-index="${index}" checked> ${displayUnit}</label>`;
+            const displayUnit = baseUnitOriginalCase || 'N/A'; 
+            unitSelectorHtml += `<label class="mr-2 cursor-pointer"><input type="radio" name="unit-options-${index}" value="${displayUnit}" class="unit-radio mr-0.5" data-item-index="${index}" checked>${displayUnit}</label>`;
         }
         unitSelectorHtml += '</div>';
 
         html += `
-            <div class="border-b py-2">
+            <div class="border-b bg-white p-3 rounded-md shadow-sm mb-2">
                 <div class="flex justify-between mb-1">
-                    <span class="font-medium">${item.name}</span>
+                    <span class="font-semibold">${item.name}</span>
                     <span class="text-blue-600">Rp ${item.price.toLocaleString('id-ID')} / ${item.unit}</span>
                 </div>
                 <div class="flex justify-between items-start">
                     <div class="flex-grow">
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-1">
+                            <button class="cart-qty-btn cart-qty-minus-btn p-1 border rounded-md hover:bg-gray-100" data-index="${index}" aria-label="Kurangi kuantitas">
+                                <i class="fas fa-minus fa-xs"></i>
+                            </button>
                             <label for="qty-${index}" class="sr-only">Kuantitas untuk ${item.name}</label>
-                            <input type="tel" id="qty-${index}" class="cart-quantity-input w-24 px-2 py-1 text-center border rounded-md" value="${item.display_quantity}" data-index="${index}" step="0.1" min="0.1" data-stock="${item.stock}">
+                            <input type="tel" id="qty-${index}" class="cart-quantity-input w-16 px-3 py-1 text-center border rounded-md" value="${item.display_quantity}" data-index="${index}" step="any" min="0"> 
+                            <button class="cart-qty-btn cart-qty-plus-btn p-1 border rounded-md hover:bg-gray-100" data-index="${index}" aria-label="Tambah kuantitas">
+                                <i class="fas fa-plus fa-xs"></i>
+                            </button>
                         </div>
                         ${unitSelectorHtml}
                     </div>
                     <div class="text-right">
                         <span class="block">Rp ${item.total.toLocaleString('id-ID')}</span>
                         <button class="cart-remove text-red-500 mt-1" data-index="${index}">
-                            <i class="fas fa-trash"></i>
+                            <i class="fas fa-trash"></i> Hapus
                         </button>
                     </div>
                 </div>
@@ -111,106 +117,68 @@ function renderCartItems() {
     });
 }
 
-function calculateItemActualQuantityAndTotal(itemIndex) {
-    const item = cartItems[itemIndex];
-    if (!item) return;
 
-    let displayQty = parseFloat(item.display_quantity);
-    if (isNaN(displayQty) || displayQty < 0) displayQty = 0;
+// Fungsi untuk menambah produk ke keranjang
+function addProductToCart(productData, quantityClicked = 1) { 
+    const productId = productData.product_id;
+    const stockQtyInBaseUnits = parseFloat(productData.stock_quantity);
+    const pricePerBaseUnit = parseFloat(productData.price);
+    const baseUnitOfProduct = productData.unit; 
 
-    item.actual_quantity = displayQty; // Default
+    const existingItemIndex = cartItems.findIndex(item => item.id === productId);
 
-    if (item.unit && item.unit.toLowerCase() === 'strip' && item.selected_unit === 'Tablet') {
-        item.actual_quantity = displayQty / PCS_PER_STRIP;
-    }
-    // Note: item.price is price per item.unit (e.g., per Strip)
-    item.total = roundUpToNearestThousand(item.price * item.actual_quantity);
-}
-
-
-// Add product to cart directly
-// Add product to cart directly
-function addProductToCart(productData, quantity = 1) { // Default quantity tetap 1 untuk kasus umum
-    const { product_id, product_name, kode_item, price, stock_quantity, unit, requires_prescription } = productData;
-    const productPrice = parseFloat(price);
-    const availableStock = parseFloat(stock_quantity); // Pastikan stok adalah float
-
-    const existingItemIndex = cartItems.findIndex(item => item.id === product_id && item.selected_unit === (unit || productData.selected_unit));
-
-    if (availableStock <= 0 && existingItemIndex === -1) {
-         Swal.fire({ icon: 'error', title: 'Stok Habis', text: `Stok produk "${product_name}" sudah habis.`, showConfirmButton: false, timer: 1500 });
-        return;
-    }
-    
-    let requestedQuantity = parseFloat(quantity); // Kuantitas yang diminta
-
-    // --- MODIFIKASI START ---
-    // Jika ini item baru DAN stok yang tersedia kurang dari kuantitas yang diminta secara default (misal 1),
-    // maka set kuantitas yang diminta menjadi sisa stok.
-    if (existingItemIndex === -1 && availableStock < requestedQuantity && availableStock > 0) {
-        requestedQuantity = availableStock;
-    }
-    // --- MODIFIKASI END ---
-
-    let initial_actual_quantity = requestedQuantity;
-    if (unit && unit.toLowerCase() === 'strip' && (productData.selected_unit === 'Tablet')) {
-        initial_actual_quantity = requestedQuantity / PCS_PER_STRIP;
-    }
-
-
-    if (existingItemIndex !== -1) {
+    if (existingItemIndex !== -1) { 
         const cartItem = cartItems[existingItemIndex];
-        // Logika untuk item yang sudah ada di keranjang.
-        // Pastikan requestedQuantity (yang mungkin sudah disesuaikan di atas jika ini item baru)
-        // ditambahkan dengan benar ke display_quantity yang ada.
-        // Untuk item yang sudah ada, kita biasanya ingin menambahkan 'quantity' asli yang di-pass (misal, 1 lagi)
-        // bukan 'requestedQuantity' yang mungkin sudah diubah.
-        // Jadi, kita perlu membedakan.
         
-        let quantityToAddOnClick = parseFloat(quantity); // Ambil 'quantity' asli untuk penambahan ke item yang ada
-
-        let newDisplayQuantity = cartItem.display_quantity + quantityToAddOnClick; 
-        let newActualQuantity = cartItem.actual_quantity;
-
-        // Hitung actual quantity baru berdasarkan display quantity baru
-        if (cartItem.unit && cartItem.unit.toLowerCase() === 'strip' && cartItem.selected_unit === 'Tablet') {
-            newActualQuantity = newDisplayQuantity / PCS_PER_STRIP;
+        let actualQuantityEquivalentToAdd;
+        if (cartItem.unit.toLowerCase() === 'strip' && cartItem.selected_unit.toLowerCase() === 'tablet') {
+            actualQuantityEquivalentToAdd = quantityClicked / PCS_PER_STRIP;
         } else {
-            newActualQuantity = newDisplayQuantity;
+            actualQuantityEquivalentToAdd = quantityClicked;
         }
 
-        if (newActualQuantity > availableStock) {
-            Swal.fire({ icon: 'error', title: 'Stok Tidak Cukup', text: `Sisa stok (dlm unit dasar) untuk "${product_name}" adalah ${availableStock}. Anda mencoba menambahkan sehingga total menjadi ${newActualQuantity.toFixed(2)}.`, showConfirmButton: false, timer: 2500 });
-            return;
-        }
-        cartItem.display_quantity = newDisplayQuantity;
-        calculateItemActualQuantityAndTotal(existingItemIndex);
+        const newPotentialActualQuantity = cartItem.actual_quantity + actualQuantityEquivalentToAdd;
 
-    } else { // Item baru
-        // 'initial_actual_quantity' sudah dihitung berdasarkan 'requestedQuantity' yang mungkin sudah disesuaikan
-        if (initial_actual_quantity > availableStock) { // Periksa lagi untuk keamanan, meskipun seharusnya sudah ditangani
-             Swal.fire({ icon: 'error', title: 'Stok Tidak Cukup', text: `Stok (dlm unit dasar) untuk "${product_name}" hanya ${availableStock}. Anda mencoba menambahkan ${initial_actual_quantity.toFixed(2)}.`, showConfirmButton: false, timer: 2500});
+        if (newPotentialActualQuantity > cartItem.stock) {
+            Swal.fire({ icon: 'error', title: 'Stok Tidak Cukup', text: `Gagal menambahkan. Sisa stok (unit dasar ${cartItem.unit}): ${cartItem.stock}.`, showConfirmButton: false, timer: 3000 });
             return;
         }
+
+        cartItem.actual_quantity = newPotentialActualQuantity;
+        cartItem.display_quantity = parseFloat(cartItem.display_quantity) + quantityClicked; 
+        cartItem.total = roundUpToNearestThousand(cartItem.price * cartItem.actual_quantity);
+
+    } else { 
+        if (stockQtyInBaseUnits <= 0) {
+            Swal.fire({ icon: 'error', title: 'Stok Habis', text: `Stok produk "${productData.product_name}" sudah habis.`, showConfirmButton: false, timer: 1500 });
+            return;
+        }
+
+        let actualQtyForNewItem = quantityClicked; 
+        if (actualQtyForNewItem > stockQtyInBaseUnits) {
+            Swal.fire('Info', `Stok terbatas untuk "${productData.product_name}". Menambahkan ${stockQtyInBaseUnits} ${baseUnitOfProduct}.`, 'info');
+            actualQtyForNewItem = stockQtyInBaseUnits;
+        }
+
         const newItem = {
-            id: product_id,
-            name: product_name,
-            kode_item: kode_item || '',
-            price: productPrice,
-            unit: unit,
-            selected_unit: unit,
-            display_quantity: requestedQuantity, // Gunakan requestedQuantity yang sudah disesuaikan
-            actual_quantity: initial_actual_quantity,
-            stock: availableStock,
-            requires_prescription: requires_prescription == 1 ? 1 : 0
+            id: productId,
+            name: productData.product_name,
+            kode_item: productData.kode_item || '',
+            price: pricePerBaseUnit,      
+            unit: baseUnitOfProduct,       
+            selected_unit: baseUnitOfProduct, 
+            actual_quantity: actualQtyForNewItem, 
+            display_quantity: actualQtyForNewItem, 
+            stock: stockQtyInBaseUnits,    
+            requires_prescription: productData.requires_prescription == 1 ? 1 : 0,
+            total: roundUpToNearestThousand(pricePerBaseUnit * actualQtyForNewItem)
         };
         cartItems.push(newItem);
-        calculateItemActualQuantityAndTotal(cartItems.length - 1);
     }
 
     renderCartItems();
     updateCartSummary();
-    showAddedToCartNotification(product_name);
+    showAddedToCartNotification(productData.product_name);
 }
 
 
@@ -256,11 +224,11 @@ let searchTimeout;
 function searchProducts(keyword, isBarcode = false) {
     if (searchTimeout) clearTimeout(searchTimeout);
     if (keyword.length === 0) {
-        $('.category-btn[data-id="0"]').click();
+        $('.category-btn[data-id="0"]').click(); 
         return;
     }
-    if (keyword.length < 2 && !isBarcode) return;
-    const delay = isBarcode ? 0 : 300;
+    if (keyword.length < 2 && !isBarcode) return; 
+    const delay = isBarcode ? 0 : 300; 
     searchTimeout = setTimeout(function() {
         $.ajax({
             url: 'ajax_search_products.php',
@@ -270,18 +238,21 @@ function searchProducts(keyword, isBarcode = false) {
             success: function(response) {
                 if (Array.isArray(response)) {
                     if (isBarcode && response.length === 1) {
-                        addProductToCart(response[0], 1); // Default quantity 1
+                        addProductToCart(response[0], 1); 
                     } else {
                         renderProducts(response);
                     }
                 } else if (response.error) {
-                    console.error('Error from server:', response.error);
+                    console.error('Error from server during search:', response.error);
+                    renderProducts([]); 
                 } else {
-                    console.error('Invalid response format:', response);
+                    console.error('Invalid response format from search:', response);
+                    renderProducts([]);
                 }
             },
             error: function(xhr, status, error) {
                 console.error('Error searching products:', error);
+                renderProducts([]); 
             }
         });
     }, delay);
@@ -294,21 +265,17 @@ function renderProducts(products) {
         html = '<div class="col-span-full text-center py-8 text-gray-500">Tidak ada produk yang ditemukan</div>';
     } else {
         products.forEach(product => {
-            // --- MODIFICATION START ---
             const stockQtyNum = parseFloat(product.stock_quantity);
-            // Assuming product.minimum_stock is available and numeric. If it can be non-numeric, add checks.
             const minStockNum = parseFloat(product.minimum_stock); 
             
             let stockDisplayHtml = '';
             if (stockQtyNum <= 0) {
                 stockDisplayHtml = `<span class="bg-red-200 text-gray-900 px-2 py-1 rounded text-sm">Stok Habis</span>`;
-            } else if (stockQtyNum < (minStockNum * 2)) { // Condition for low stock (yellow warning), adjust if needed
-                                                        // For example, if threshold is just minimum_stock, use: stockQtyNum < minStockNum 
+            } else if (stockQtyNum < (minStockNum * 2)) { 
                 stockDisplayHtml = `<span class="bg-yellow-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`;
             } else {
                 stockDisplayHtml = `<span class="bg-green-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`;
             }
-            // --- MODIFICATION END ---
 
             html += `
                 <div class="product-card bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition"
@@ -334,50 +301,9 @@ function renderProducts(products) {
     $('#products-container').html(html);
     $('.product-card').click(function() {
         const productData = $(this).data('product');
-        addProductToCart(productData, 1); // Default quantity 1
+        addProductToCart(productData, 1); 
     });
 }
-
-// Render products in grid
-/*function renderProducts(products) {
-    let html = '';
-    if (products.length === 0) {
-        html = '<div class="col-span-full text-center py-8 text-gray-500">Tidak ada produk yang ditemukan</div>';
-    } else {
-        products.forEach(product => {
-            html += `
-                <div class="product-card bg-white rounded-lg shadow-md p-3 cursor-pointer hover:shadow-lg transition"
-                     data-product='${JSON.stringify(product)}'>
-                    <div class="h-24 bg-gray-200 rounded-md mb-2 flex items-center justify-center relative">
-                        <i class="fas fa-pills text-gray-400 text-3xl"></i>
-                        ${product.requires_prescription == 1 ? 
-                        '<span class="absolute top-0 right-0 bg-yellow-500 text-white text-xs px-1 rounded">Resep</span>' : ''}
-                    </div>
-                    <h3 class="font-medium">${product.product_name}</h3>
-                    <div class="flex justify-between items-center mt-1">
-                        <p class="text-sm text-gray-500">${product.kode_item || ''}</p>
-                        <span class="bg-blue-100 text-blue-900 px-2 py-1 rounded text-sm">${product.posisi}</span>
-                    </div>
-                    <div class="flex justify-between items-center mt-1">
-                        <p class="text-blue-600 font-bold">Rp ${parseInt(product.price).toLocaleString('id-ID')}</p>
-                        ${
-                            parseInt(product.stock_quantity) === 0
-                                ? `<span class="bg-red-200 text-gray-900 px-2 py-1 rounded text-sm">Stok Habis</span>`
-                                : parseInt(product.stock_quantity) < product.minimum_stock * 2
-                                ? `<span class="bg-yellow-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`
-                                : `<span class="bg-green-100 text-gray-900 px-2 py-1 rounded text-sm">Stok: ${product.stock_quantity}</span>`
-                        }
-                    </div>
-                </div>
-            `;
-        });
-    }
-    $('#products-container').html(html);
-    $('.product-card').click(function() {
-        const productData = $(this).data('product');
-        addProductToCart(productData, 1); // Default quantity 1
-    });
-}*/
 
 // Save transaction
 function saveTransaction() {
@@ -406,16 +332,16 @@ function saveTransaction() {
         discount_amount: discountAmount,
         total_amount: grandTotal,
         payment_method_id: selectedPaymentMethod,
-        payment_status: 'paid',
+        payment_status: 'paid', 
         notes: '',
         items: cartItems.map(item => ({
             product_id: item.id,
-            quantity: item.actual_quantity, // This is actual_quantity in base units
-            display_quantity: item.display_quantity, // ADD THIS LINE
+            quantity: item.actual_quantity, 
+            display_quantity: item.display_quantity, 
             unit_price: item.price, 
             selected_unit: item.selected_unit || item.unit,
             total_price_rounded: item.total,
-            discount_percent: 0
+            discount_percent: 0 
         }))
         
     };
@@ -428,8 +354,7 @@ function saveTransaction() {
             if (response.success) {
                 lastTransactionId = response.sale_id;
                 lastInvoiceNumber = response.invoice_number;
-                $('#payment-modal').addClass('hidden');
-                $('#success-invoice').text(response.invoice_number);
+                $('#success-invoice').text(response.invoice_number); 
                 $('#success-modal').removeClass('hidden');
                 cartItems = [];
                 renderCartItems();
@@ -464,7 +389,13 @@ function togglePaymentMethod(methodId, methodName) {
     } else {
         $('#cash-payment-fields').addClass('hidden');
     }
-    updatePaymentButtonState(); // Call this to enable/disable process button
+    
+    // Aktifkan tombol pembayaran jika ada item di keranjang dan metode pembayaran dipilih
+    if (cartItems.length > 0 && selectedPaymentMethod !== null) {
+        $('#process-payment-btn').prop('disabled', false);
+    } else {
+        $('#process-payment-btn').prop('disabled', true);
+    }
 }
 
 function updatePaymentButtonState() {
@@ -473,7 +404,8 @@ function updatePaymentButtonState() {
     let isCashPaymentValid = true;
 
     if ($('#cash-payment-fields').is(':visible')) {
-        const totalAmount = parseInt($('#grand-total').text().replace(/[^0-9.-]+/g, '')) || 0;
+        const totalAmountText = $('#grand-total').text() || $('#sticky-grand-total-display').text(); 
+        const totalAmount = parseInt(totalAmountText.replace(/[^0-9.-]+/g, '')) || 0;
         const cashAmount = parseInt($('#cash-amount').val().replace(/\D/g, '')) || 0;
         isCashPaymentValid = cashAmount >= totalAmount;
     }
@@ -487,18 +419,20 @@ function updatePaymentButtonState() {
 
 
 function calculateChange() {
+    const grandTotalText = $('#grand-total').text().trim() || $('#sticky-grand-total-display').text().trim(); 
+    const totalAmount = parseInt(grandTotalText.replace(/Rp\s?/, '').replace(/\./g, '')) || 0;
+    
     if (!$('#cash-amount').val().trim()) {
         $('#change-amount').text('Rp 0');
-         updatePaymentButtonState(); // Update button state when cash amount is empty
-        return { totalAmount: 0, cashAmount: 0, changeAmount: 0 };
+        updatePaymentButtonState(); 
+        return { totalAmount: totalAmount, cashAmount: 0, changeAmount: 0 };
     }
-    const grandTotalText = $('#grand-total').text().trim();
-    const totalAmount = parseInt(grandTotalText.replace(/Rp\s?/, '').replace(/\./g, '')) || 0;
+    
     const cashAmountText = $('#cash-amount').val().trim();
     const cashAmount = parseInt(cashAmountText.replace(/\D/g, '')) || 0;
     const changeAmount = Math.max(0, cashAmount - totalAmount);
     $('#change-amount').text(formatCurrency(changeAmount));
-    updatePaymentButtonState(); // Update button state after calculating change
+    updatePaymentButtonState(); 
     return { totalAmount, cashAmount, changeAmount };
 }
 
@@ -512,12 +446,16 @@ function formatCashInput(input) {
         if (originalValue[i] === '.') separatorCountBefore++;
     }
     input.value = formattedValue;
-    const newSeparatorCountBefore = formattedValue.substr(0, cursorPos + separatorCountBefore).split('.').length - 1;
+    const newSeparatorCountBefore = formattedValue.substr(0, cursorPos + (formattedValue.length - originalValue.length)).split('.').length - 1;
     const newCursorPos = cursorPos + (newSeparatorCountBefore - separatorCountBefore);
+    
     setTimeout(() => {
-        if (input.setSelectionRange) input.setSelectionRange(newCursorPos, newCursorPos);
+        if (input.setSelectionRange) {
+            input.setSelectionRange(newCursorPos, newCursorPos);
+        }
     }, 0);
 }
+
 
 function detectBarcodeScanner(e) {
     const currentTime = new Date().getTime();
@@ -530,83 +468,149 @@ function detectBarcodeScanner(e) {
     lastKeyTime = currentTime;
     clearTimeout(barcodeTimeout);
     barcodeTimeout = setTimeout(function() {
-        if (barcodeBuffer.length >= 8 && avgKeyInterval < 50) {
+        if (barcodeBuffer.length >= 8 && avgKeyInterval < 50) { 
             searchProducts(barcodeBuffer, true);
         }
         barcodeBuffer = ''; keyCount = 0; avgKeyInterval = 0; isBarcodeScanning = false;
-    }, 500);
+    }, 500); 
 }
 
 // Document ready
 $(document).ready(function() {
-    $('#cart-items').on('change', '.cart-quantity-input', function() {
+    // Event handler untuk mengubah kuantitas di keranjang (ketik manual)
+    $('#cart-items').on('input', '.cart-quantity-input', function() {
         const index = parseInt($(this).data('index'));
-        let newDisplayQuantity = parseFloat($(this).val());
+        const item = cartItems[index];
+        if (!item) return;
 
-        if (isNaN(newDisplayQuantity) || newDisplayQuantity <= 0) {
-            Swal.fire({ icon: 'error', title: 'Kuantitas Tidak Valid', text: 'Mohon masukkan kuantitas yang valid (>0).', timer: 2000, showConfirmButton: false });
-            $(this).val(cartItems[index].display_quantity); // Revert to old display quantity
-            return;
+        let newDisplayQuantity = parseFloat($(this).val());
+        if (isNaN(newDisplayQuantity) || newDisplayQuantity < 0) {
+            newDisplayQuantity = 0; 
         }
         
-        cartItems[index].display_quantity = newDisplayQuantity;
-        calculateItemActualQuantityAndTotal(index); // Recalculates actual_quantity and total
+        item.display_quantity = newDisplayQuantity; 
 
-        if (cartItems[index].actual_quantity > cartItems[index].stock) {
-            Swal.fire({ icon: 'error', title: 'Stok Tidak Cukup', text: `Stok untuk produk ini (dlm unit dasar ${cartItems[index].unit}) adalah ${cartItems[index].stock}. Kuantitas diminta ${cartItems[index].actual_quantity}.`, timer: 2500, showConfirmButton: false });
-            // Revert logic might be needed here if strict stock check is enforced before allowing change
-            // For now, it will show error, but the value might persist if not handled by reverting display_quantity
-            // A better UX might be to cap display_quantity based on stock and selected_unit
-            // $(this).val(cartItems[index].display_quantity); // Simple revert if needed
-            // calculateItemActualQuantityAndTotal(index); // Recalculate if reverted
+        let newActualQuantity;
+        if (item.unit.toLowerCase() === 'strip' && item.selected_unit.toLowerCase() === 'tablet') {
+            newActualQuantity = item.display_quantity / PCS_PER_STRIP;
+        } else { 
+            newActualQuantity = item.display_quantity;
         }
+
+        if (newActualQuantity > item.stock) {
+            Swal.fire({ icon: 'error', title: 'Stok Tidak Cukup', text: `Stok (unit dasar ${item.unit}) hanya ${item.stock}. Kuantitas disesuaikan.`, timer: 3000, showConfirmButton: false });
+            item.actual_quantity = item.stock; 
+            if (item.unit.toLowerCase() === 'strip' && item.selected_unit.toLowerCase() === 'tablet') {
+                item.display_quantity = item.actual_quantity * PCS_PER_STRIP;
+            } else {
+                item.display_quantity = item.actual_quantity;
+            }
+        } else {
+            item.actual_quantity = newActualQuantity;
+        }
+        
+        item.total = roundUpToNearestThousand(item.price * item.actual_quantity);
         
         renderCartItems(); 
         updateCartSummary();
     });
 
-    $('#cart-items').on('change', '.unit-radio', function() {
-        const index = parseInt($(this).data('item-index'));
-        const newSelectedUnit = $(this).val();
+    // Event handler untuk tombol +/- kuantitas
+    $('#cart-items').on('click', '.cart-qty-btn', function() {
+        const index = parseInt($(this).data('index'));
+        const item = cartItems[index];
+        if (!item) return;
 
-        if (cartItems[index]) {
-            cartItems[index].selected_unit = newSelectedUnit;
-            calculateItemActualQuantityAndTotal(index); // Recalculates actual_quantity and total
+        const qtyInput = $(`#qty-${index}`);
+        let currentDisplayQty = parseFloat(qtyInput.val());
+        if (isNaN(currentDisplayQty)) currentDisplayQty = 0; // Default jika input tidak valid
 
-            if (cartItems[index].actual_quantity > cartItems[index].stock) {
-                 Swal.fire({ icon: 'warning', title: 'Stok Mungkin Tidak Cukup', text: `Stok produk (dlm unit dasar ${cartItems[index].unit}) adalah ${cartItems[index].stock}. Kuantitas saat ini menjadi ${cartItems[index].actual_quantity} ${cartItems[index].unit}. Harap sesuaikan kuantitas jika perlu.`, timer: 3500, showConfirmButton: false });
-                // Potentially adjust display_quantity here or just warn
-            }
-            renderCartItems(); 
-            updateCartSummary(); 
+        if ($(this).hasClass('cart-qty-plus-btn')) {
+            currentDisplayQty += 1;
+        } else if ($(this).hasClass('cart-qty-minus-btn')) {
+            currentDisplayQty -= 1;
         }
+
+        if (currentDisplayQty < 0) { // Batasi minimal 0 atau 1 sesuai kebutuhan
+            currentDisplayQty = 0; 
+        }
+        
+        qtyInput.val(currentDisplayQty);
+        qtyInput.trigger('input'); // PENTING: Picu event input agar logika update lainnya berjalan
     });
 
+
+    // Event handler untuk mengubah unit di keranjang
+    $('#cart-items').on('change', '.unit-radio', function() {
+        const index = parseInt($(this).data('item-index'));
+        const item = cartItems[index];
+        if (!item) return;
+
+        const newSelectedUnit = $(this).val();
+        const currentDisplayQtyFromInput = parseFloat($(`#qty-${index}`).val()); 
+        const displayQtyToPreserve = isNaN(currentDisplayQtyFromInput) ? parseFloat(item.display_quantity) : currentDisplayQtyFromInput;
+
+        item.selected_unit = newSelectedUnit; 
+
+        let newActualQuantityBasedOnDisplay;
+        if (item.unit.toLowerCase() === 'strip' && item.selected_unit.toLowerCase() === 'tablet') {
+            newActualQuantityBasedOnDisplay = displayQtyToPreserve / PCS_PER_STRIP;
+        } else { 
+            newActualQuantityBasedOnDisplay = displayQtyToPreserve;
+        }
+
+        if (newActualQuantityBasedOnDisplay > item.stock) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Stok Tidak Cukup Untuk Unit Baru',
+                text: `Stok (unit dasar ${item.unit}) hanya ${item.stock}. Kuantitas tampilan akan disesuaikan dengan stok maksimum pada unit ${newSelectedUnit}.`,
+                timer: 4000,
+                showConfirmButton: false
+            });
+            item.actual_quantity = item.stock; 
+            if (item.unit.toLowerCase() === 'strip' && item.selected_unit.toLowerCase() === 'tablet') {
+                item.display_quantity = item.actual_quantity * PCS_PER_STRIP;
+            } else {
+                item.display_quantity = item.actual_quantity;
+            }
+        } else {
+            item.actual_quantity = newActualQuantityBasedOnDisplay;
+            item.display_quantity = displayQtyToPreserve; 
+        }
+        
+        item.total = roundUpToNearestThousand(item.price * item.actual_quantity);
+
+        renderCartItems(); 
+        updateCartSummary(); 
+    });
+    
     $(document).on('keypress', function(e) {
-        if ($('input:focus, textarea:focus').length > 0 && !$('#product-search').is(':focus')) {
-            if (e.which === 13 && $('#product-search').is(':focus')) {
+        if ($('input:focus, textarea:focus').length > 0) {
+            if (e.which === 13 && $('#product-search').is(':focus')) { 
                 e.preventDefault();
                 const keyword = $('#product-search').val().trim();
-                if (keyword.length > 0) searchProducts(keyword, true); 
+                if (keyword.length > 0) {
+                    searchProducts(keyword, true); 
+                }
             }
-            return;
+            return; 
         }
-        if (e.which === 13 && barcodeBuffer.length > 0) {
+
+        if (e.which === 13 && barcodeBuffer.length > 0) { 
             e.preventDefault();
-            if (barcodeBuffer.length >= 8 || avgKeyInterval < 50) {
+            if (barcodeBuffer.length >= 3 && avgKeyInterval < 100) { 
                 searchProducts(barcodeBuffer, true);
-                barcodeBuffer = ''; keyCount = 0; avgKeyInterval = 0; isBarcodeScanning = false;
             }
+            barcodeBuffer = ''; keyCount = 0; avgKeyInterval = 0; isBarcodeScanning = false;
             return;
         }
-        if (e.which < 32 || e.which > 126) return;
+
+        if (e.which < 32 || e.which > 126) return; 
         barcodeBuffer += String.fromCharCode(e.which);
-        detectBarcodeScanner(e);
-        if (avgKeyInterval < 50 && barcodeBuffer.length > 3) {
-            isBarcodeScanning = true;
-            const searchInput = $('#product-search');
-            if (!searchInput.is(':focus')) searchInput.focus().val(barcodeBuffer);
-            else searchInput.val(barcodeBuffer);
+        detectBarcodeScanner(e); 
+
+        if (avgKeyInterval < 50 && barcodeBuffer.length > 3 && !isBarcodeScanning) {
+            isBarcodeScanning = true; 
         }
     });
     
@@ -617,48 +621,43 @@ $(document).ready(function() {
     });
     
     $('#product-search').on('input', function() {
-        if (!isBarcodeScanning) searchProducts($(this).val().trim(), false);
-    });
-    
-    $('#clear-search').click(function() {
-        $('#product-search').val(''); $(this).hide(); $('.category-btn[data-id="0"]').click(); 
-    });
-    
-    $('#product-search').on('input', function() {
-        if ($(this).val().length > 0) $('#clear-search').show();
+        const keyword = $(this).val().trim();
+        if (!isBarcodeScanning) { 
+            searchProducts(keyword, false);
+        }
+        if (keyword.length > 0) $('#clear-search').show();
         else $('#clear-search').hide();
     });
     
-    $('#product-search').on('keypress', function(e) {
-        if (e.which === 13) { 
-            e.preventDefault();
-            const keyword = $(this).val().trim();
-            if (keyword.length > 0) searchProducts(keyword, true);
-        }
+    $('#clear-search').click(function() {
+        $('#product-search').val('').focus(); 
+        $(this).hide(); 
+        $('.category-btn[data-id="0"]').click(); 
     });
     
     $('.payment-method-btn').click(function() {
-        $('.payment-method-btn').removeClass('bg-blue-500 text-white').addClass('bg-blue-100 text-blue-600');
-        $(this).removeClass('bg-blue-100 text-blue-600').addClass('bg-blue-500 text-white');
+        $('.payment-method-btn').removeClass('bg-blue-500 text-white').addClass('bg-white hover:bg-blue-400 text-blue-600'); 
+        $(this).removeClass('bg-white hover:bg-blue-400 text-blue-600').addClass('bg-blue-500 text-white');
         togglePaymentMethod($(this).data('id'), $(this).text().trim());
     });
     
     $('#cash-amount').on('input', function() {
-        formatCashInput(this); calculateChange();
+        formatCashInput(this); 
+        calculateChange();
     });
     
     $('#cash-amount').on('keydown', function(e) {
         if (e.key === 'Enter') {
-            if (!$('#process-payment-btn').is(':disabled')) { // Only process if button is not disabled
+            e.preventDefault(); 
+            if (!$('#process-payment-btn').is(':disabled')) {
                  $('#process-payment-btn').click();
             }
-            e.preventDefault();
         }
     });
     
     $('#process-payment-btn').click(function() {
         if (cartItems.length === 0) {
-            Swal.fire({ icon: 'error', title: 'Keranjang kosong', showConfirmButton: false, timer: 1500 }); return;
+            Swal.fire({ icon: 'error', title: 'Keranjang kosong', text:'Tidak ada item di keranjang.', showConfirmButton: false, timer: 1500 }); return;
         }
         if (selectedPaymentMethod === null) {
             Swal.fire({ icon: 'info', title: 'Metode Pembayaran', text: 'Mohon pilih metode pembayaran.', showConfirmButton: false, timer: 1500 }); return;
@@ -666,34 +665,51 @@ $(document).ready(function() {
         const needsPrescription = cartItems.some(item => item.requires_prescription === 1);
         if (needsPrescription) {
             const doctorId = $('#doctor-id').val();
-            const prescriptionNumber = $('#prescription-number').val();
+            const prescriptionNumber = $('#prescription-number').val().trim();
             if (!doctorId || !prescriptionNumber) {
-                Swal.fire({ icon: 'warning', title: 'Resep Dokter', text: `Informasi resep dokter diperlukan.`, showConfirmButton: false, timer: 1500 }); return;
+                Swal.fire({ icon: 'warning', title: 'Resep Dokter Diperlukan', text: `Ada item yang memerlukan resep. Mohon lengkapi informasi dokter dan nomor resep.`, showConfirmButton: false, timer: 2500 }); return;
             }
         }
-        if ($('#cash-payment-fields').is(':visible') && (!$('#cash-amount').val().trim() || (parseInt($('#cash-amount').val().replace(/\D/g, '')) || 0) < (parseInt($('#grand-total').text().replace(/[^0-9.-]+/g, '')) || 0) ) ) {
-             Swal.fire({ icon: 'error', title: 'Pembayaran Kurang', text: 'Jumlah pembayaran tunai kurang atau kosong.', confirmButtonText: 'OK' }).then(() => $('#cash-amount').focus()); return;
+        if ($('#cash-payment-fields').is(':visible')) {
+            const grandTotalText = $('#grand-total').text() || $('#sticky-grand-total-display').text();
+            const totalAmount = parseInt(grandTotalText.replace(/[^0-9.-]+/g,'')) || 0;
+            const cashAmount = parseInt($('#cash-amount').val().replace(/\D/g, '')) || 0;
+            /*if (!$('#cash-amount').val().trim() || cashAmount < totalAmount) {
+                Swal.fire({ icon: 'error', title: 'Pembayaran Kurang', text: 'Jumlah pembayaran tunai kurang atau kosong.', confirmButtonText: 'OK' }).then(() => $('#cash-amount').focus()); return;
+            }*/
         }
         saveTransaction();
     });
     
-    $('#discount-amount').on('input', function() { updateCartSummary(); });
-    
-    $('#success-print').click(function() {
-        if (lastTransactionId) window.open('print_receipt.php?id=' + lastTransactionId, '_blank');
+    $('#discount-amount').on('input', function() { 
+        this.value = this.value.replace(/\D/g, '');
+        updateCartSummary(); 
+        calculateChange(); 
     });
     
-    $('#success-new').click(function() {
-        $('#success-modal').addClass('hidden'); location.reload();
+    $('#success-modal').on('click', '#success-print', function() { 
+        if (lastTransactionId) {
+            window.open('print_receipt.php?id=' + lastTransactionId, '_blank');
+        }
     });
     
-    $(window).click(function(e) {
-        if ($(e.target).is('#payment-modal')) $('#payment-modal').addClass('hidden');
-        if ($(e.target).is('#success-modal')) $('#success-modal').addClass('hidden');
+    $('#success-modal').on('click', '#success-new', function() { 
+        $('#success-modal').addClass('hidden'); 
+        if (typeof clearUIForHeldOrNewTransaction_inline === 'function') {
+            clearUIForHeldOrNewTransaction_inline(); 
+        } else {
+            cartItems = []; renderCartItems(); updateCartSummary();
+            $('#customer-name').val(''); $('#doctor-id').val(''); $('#prescription-number').val('');
+            $('#discount-amount').val('0'); $('#cash-amount').val(''); $('#change-amount').text('Rp 0');
+            $('.payment-method-btn').removeClass('bg-blue-500 text-white').addClass('bg-blue-100 text-blue-600');
+            selectedPaymentMethod = null; $('#cash-payment-fields').addClass('hidden');
+        }
+         $('#product-search').focus();
+         location.reload();
     });
     
     renderCartItems();
     updateCartSummary();
-    $('.category-btn[data-id="0"]').click();
+    $('.category-btn[data-id="0"]').click(); 
     $('#product-search').focus();
 });
