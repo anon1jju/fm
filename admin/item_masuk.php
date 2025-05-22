@@ -10,7 +10,7 @@ if (!$farma->checkPersistentSession() || !isset($_SESSION["role"]) || $_SESSION[
 }
 
 $pdo = $farma->getPDO();
-$successMessage = $_SESSION['success_message'] ?? null;
+//$successMessage = $_SESSION['success_message'] ?? null;
 $errorMessage = $_SESSION['error_message'] ?? null;
 unset($_SESSION['success_message'], $_SESSION['error_message']); // Hapus pesan setelah ditampilkan
 
@@ -113,7 +113,7 @@ if ($pdo) {
             right: 0.5rem !important;
         }
         .select2-dropdown {
-            border: 1px solid #e2e8f0 !important;
+            border: 2px solid #e2e8f0 !important;
             border-radius: 0.375rem !important;
             z-index: 1050; /* Ensure dropdown is above other elements */
         }
@@ -126,6 +126,36 @@ if ($pdo) {
             font-size: 0.775rem; /* text-sm */
             margin-top: 0.25rem; /* mt-1 */
         }
+        .input-with-icon-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.input-with-icon-wrapper .ti-form-input {
+    padding-right: 2.8rem; /* Space for the icon */
+}
+.input-with-icon-wrapper .generate-kode-item-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: #6b7280;
+    z-index: 2;
+}
+.input-with-icon-wrapper .generate-kode-item-icon:hover {
+    color: #111827;
+}
+.input-with-icon-wrapper .generate-kode-item-icon.is-loading {
+    cursor: default;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: translateY(-50%) rotate(0deg); }
+    100% { transform: translateY(-50%) rotate(-360deg); }
+}
+/* Pastikan .error-message dan .ti-form-input.is-invalid sudah ada dari CSS Anda sebelumnya */
     </style>
 </head>
 <body>
@@ -143,23 +173,12 @@ if ($pdo) {
                         <i class="ri-check-double-line ltr:mr-2 rtl:ml-2"></i><?php echo htmlspecialchars($successMessage); ?>
                     </div>
                 <?php endif; ?>
-                <?php if ($errorMessage && !str_contains($errorMessage, "Kesalahan database")): /* Hide generic DB error if specific errors below are shown */ ?>
+
+                <?php if ($errorMessage && strpos($errorMessage, "Kesalahan database") === false): ?>
                     <div class="my-4 p-4 bg-red-100 text-red-700 border border-red-300 rounded-md" role="alert">
                         <i class="ri-error-warning-line ltr:mr-2 rtl:ml-2"></i><?php echo $errorMessage; ?>
                     </div>
                 <?php endif; ?>
-
-                <!-- Tab Navigation -->
-                <div class="border-b border-gray-200 dark:border-white/10 mb-4">
-                    <nav class="flex space-x-2 rtl:space-x-reverse" aria-label="Tabs" role="tablist">
-                        <button type="button" class="hs-tab-active:font-semibold hs-tab-active:border-primary hs-tab-active:text-primary py-4 px-1 inline-flex items-center gap-2 border-b-[3px] border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-primary active" id="tab-tambah-baru" data-hs-tab="#content-tambah-baru" aria-controls="content-tambah-baru" role="tab">
-                            Tambah Barang Baru
-                        </button>
-                        <button type="button" class="hs-tab-active:font-semibold hs-tab-active:border-primary hs-tab-active:text-primary py-4 px-1 inline-flex items-center gap-2 border-b-[3px] border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-primary" id="tab-tambah-stok" data-hs-tab="#content-tambah-stok" aria-controls="content-tambah-stok" role="tab">
-                            Tambah Stok Barang Tersedia
-                        </button>
-                    </nav>
-                </div>
 
                 <!-- Tab Content -->
                 <div class="mt-3">
@@ -167,111 +186,86 @@ if ($pdo) {
                     <div id="content-tambah-baru" role="tabpanel" aria-labelledby="tab-tambah-baru">
                         <div class="grid grid-cols-12 gap-x-6">
                             <div class="xl:col-span-12 col-span-12">
-                                <div class="box">
-                                    <div class="box-header">
+                                <div class="box p-15">
+                                    <div class="box-header p-10">
                                         <div class="box-title flex items-center">
-                                            <i class="ri-add-box-line text-xl ltr:mr-2 rtl:ml-2"></i> Tambah Barang Baru
+                                            <i class="ri-add-box-line text-xl ltr:mr-2 rtl:ml-2"></i> Input Barang Baru
                                         </div>
                                     </div>
-                                    <div class="box-body p-6">
-                                        <?php if ($errorMessage && str_contains($errorMessage, "Kesalahan database")): ?>
+                                    <div class="box-body p-10">
+                                        <?php if ($errorMessage && strpos($errorMessage, "Kesalahan database")): ?>
                                             <div class="mb-4 p-4 bg-red-100 text-red-700 border border-red-300 rounded-md" role="alert">
                                                 <i class="ri-error-warning-line ltr:mr-2 rtl:ml-2"></i><?php echo $errorMessage; ?>
                                             </div>
                                         <?php endif; ?>
-                                        <form action="../prosesdata/process_tambah_barang.php" method="POST" id="tambahBarangForm">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Produk baru akan ditambahkan ke sistem.</p>
-                                            
-                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-4">
-                                                <div>
-                                                    <label for="nama_produk" class="ti-form-label">Nama Produk <span class="text-red-500">*</span></label>
-                                                    <input type="text" class="ti-form-input" id="nama_produk" name="nama_produk" required placeholder="Nama lengkap produk" value="<?= htmlspecialchars($form_data['nama_produk'] ?? '') ?>">
-                                                </div>
-                                                <div>
-                                                    <label for="kode_item" class="ti-form-label">Kode Item</label>
-                                                    <div class="input-group">
-                                                        <input type="text" class="ti-form-input" id="kode_item" name="kode_item" placeholder="Auto / Manual" value="<?= htmlspecialchars($form_data['kode_item'] ?? '') ?>">
-                                                        <button type="button" id="btnGenerateKodeItem" class="ti-btn ti-btn-info btn-generate !mb-0 px-2 py-1 text-sm">Generate</button>
-                                                    </div>
-                                                    <div id="kode_item_feedback" class="error-message"></div>
-                                                </div>
-                                                <div>
-                                                    <label for="barcode" class="ti-form-label">Barcode</label>
-                                                    <input type="text" class="ti-form-input" id="barcode" name="barcode" placeholder="Scan atau ketik barcode" value="<?= htmlspecialchars($form_data['barcode'] ?? '') ?>">
-                                                    <div id="barcode_error" class="error-message"></div>
-                                                </div>
-                                                <div>
-                                                    <label for="category_id" class="ti-form-label">Kategori <span class="text-red-500">*</span></label>
-                                                    <select class="ti-form-select select2-basic" id="category_id" name="category_id" required data-placeholder="Pilih Kategori">
-                                                        <option value=""></option>
-                                                        <?php foreach ($categories as $category): ?>
-                                                        <option value="<?= htmlspecialchars($category['category_id']) ?>" <?= (isset($form_data['category_id']) && $form_data['category_id'] == $category['category_id']) ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($category['category_name']) ?>
-                                                        </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label for="supplier_id" class="ti-form-label">Supplier</label>
-                                                    <select class="ti-form-select select2-basic" id="supplier_id" name="supplier_id" data-placeholder="Pilih Supplier (Jika ada)">
-                                                        <option value=""></option>
-                                                        <?php foreach ($suppliers as $supplier): ?>
-                                                        <option value="<?= htmlspecialchars($supplier['supplier_id']) ?>" <?= (isset($form_data['supplier_id']) && $form_data['supplier_id'] == $supplier['supplier_id']) ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($supplier['supplier_name']) ?>
-                                                        </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label for="batch_number" class="ti-form-label">No. Batch</label>
-                                                    <input type="text" class="ti-form-input" id="batch_number" name="batch_number" placeholder="Nomor batch produk" value="<?= htmlspecialchars($form_data['batch_number'] ?? '') ?>">
-                                                </div>
-                                                <div>
-                                                    <label for="expire_date" class="ti-form-label">Expire <span class="text-red-500">*</span></label>
-                                                    <input type="text" class="ti-form-input flatpickr-date" id="expire_date" name="expire_date" placeholder="YYYY-MM-DD" required value="<?= htmlspecialchars($form_data['expire_date'] ?? '') ?>">
-                                                </div>
-                                                <div>
-                                                    <label for="cost_price" class="ti-form-label">Harga Modal <span class="text-red-500">*</span></label>
-                                                    <input type="number" step="any" class="ti-form-input" id="cost_price" name="cost_price" required min="0" placeholder="0.00" value="<?= htmlspecialchars($form_data['cost_price'] ?? '') ?>">
-                                                </div>
-                                                <div>
-                                                    <label for="price" class="ti-form-label">Harga Jual <span class="text-red-500">*</span></label>
-                                                    <input type="number" step="any" class="ti-form-input" id="price" name="price" required min="0" placeholder="0.00" value="<?= htmlspecialchars($form_data['price'] ?? '') ?>">
-                                                </div>
-                                                <div>
-                                                    <label for="stock_quantity" class="ti-form-label">Stok Masuk <span class="text-red-500">*</span></label>
-                                                    <input type="number" step="any" class="ti-form-input" id="stock_quantity" name="stock_quantity" required min="0.01" placeholder="Jumlah stok, misal: 10.50" value="<?= htmlspecialchars($form_data['stock_quantity'] ?? '') ?>">
-                                                </div>
-                                                    <div>
-                                                    <label for="minimum_stock" class="ti-form-label">Stok Minimum <span class="text-red-500">*</span></label>
-                                                    <input type="number" step="any" class="ti-form-input" id="minimum_stock" name="minimum_stock" required min="0.00" placeholder="Batas stok minimum, misal: 5.00" value="<?= htmlspecialchars($form_data['minimum_stock'] ?? '') ?>">
-                                                </div>
-                                                <div>
-                                                    <label for="unit" class="ti-form-label">Unit <span class="text-red-500">*</span></label>
-                                                    <select class="ti-form-select select2-basic" id="unit" name="unit" required data-placeholder="Pilih Unit Dasar">
-                                                        <option value=""></option>
-                                                        <?php foreach ($units as $unit_item): ?>
-                                                        <option value="<?= htmlspecialchars($unit_item['unit_id']) ?>" <?= (isset($form_data['unit']) && $form_data['unit'] == $unit_item['unit_id']) ? 'selected' : '' ?>>
-                                                            <?= htmlspecialchars($unit_item['unit_name']) ?>
-                                                        </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div class="lg:col-span-2">
-                                                    <label for="posisi" class="ti-form-label">Posisi</label>
-                                                    <input type="text" class="ti-form-input" id="posisi" name="posisi" placeholder="Contoh: Rak A1, Etalase Depan" value="<?= htmlspecialchars($form_data['posisi'] ?? '') ?>">
-                                                </div>
-                                                
-                                                <div class="lg:col-span-2">
-                                                    <label for="reason" class="ti-form-label">Catatan<span class="text-red-500">*</span></label>
-                                                    <textarea class="ti-form-input" id="reason" name="reason" rows="3" placeholder="Masukkan alasan atau catatan untuk item masuk..." required><?= htmlspecialchars($form_data['reason'] ?? 'Penambahan produk baru') ?></textarea>
-                                                </div>
-
+                                        <form action="../prosesdata/process_tambah_barang2.php" method="POST" id="tambahBarangForm">
+                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Input beberapa produk sekaligus, satu baris untuk satu produk.</p>
+                                        
+                                            <table class="min-w-full border text-sm text-left" id="produkTable">
+                                                <thead>
+                                                    <tr class="bg-gray-100">
+                                                        <th class="border px-1 py-1">Kode Item</th>
+                                                        <th class="border px-2 py-1">Barcode</th>
+                                                        <th class="border px-2 py-1">Nama Produk</th>
+                                                        <th class="border px-2 py-1">Jenis</th>
+                                                        <th class="border px-2 py-1">Satuan</th>
+                                                        <th class="border px-2 py-1">Stok Min</th>
+                                                        <th class="border px-2 py-1">Harga Modal</th>
+                                                        <th class="border px-2 py-1">Harga Jual</th>
+                                                        <th class="border px-2 py-1">Batch</th>
+                                                        <th class="border px-2 py-1">Expire</th>
+                                                        <!--<th class="border px-2 py-1">Catatan</th>-->
+                                                        <th class="border px-2 py-1">Aksi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="tableBody">
+                                                    <tr>
+                                                        <td>
+                                                            <div class="input-with-icon-wrapper">
+                                                                <input type="text" name="kode_item[]" class="ti-form-input kode-item-input" placeholder="Otomatis/Input manual" style="width: 90px; font-size: 12px;"/>
+                                                                <i class="ri-loop-left-line generate-kode-item-icon" title="Generate Kode Item"></i>
+                                                                <div class="error-message kode-item-error-message" style="display: none;"></div>
+                                                            </div>
+                                                        </td>
+                                                        <td><input type="text" name="barcode[]" class="ti-form-input w-full" /><div id="barcode_error" class="error-message"></div></td>
+                                                        
+                                                        <td><input type="text" name="nama_produk[]" class="ti-form-input w-full" required /></td>
+                                                        <td>
+                                                            <select name="category_id[]" class="ti-form-select w-full">
+                                                                <option value="">Pilih</option>
+                                                                <?php foreach ($categories as $category): ?>
+                                                                    <option value="<?= htmlspecialchars($category['category_id']) ?>"><?= htmlspecialchars($category['category_name']) ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <select name="unit[]" class="ti-form-select w-full" required>
+                                                                <option value="">Pilih</option>
+                                                                <?php foreach ($units as $unit_item): ?>
+                                                                    <option value="<?= htmlspecialchars($unit_item['unit_id']) ?>"><?= htmlspecialchars($unit_item['unit_name']) ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </td>
+                                                        <td><input type="number" step="any" min="0" name="minimum_stock[]" class="ti-form-input w-full" required /></td>
+                                                        <td><input type="number" step="any" min="0" name="cost_price[]" class="ti-form-input w-full" required /></td>
+                                                        <td><input type="number" step="any" min="0" name="price[]" class="ti-form-input w-full" required /></td>
+                                                        <td><input type="text" name="batch_number[]" class="ti-form-input w-full" /></td>
+                                                        <td><input type="tel" name="expire_date[]" class="ti-form-input w-full" placeholder="DD-MM-YYYY" required /></td>
+                                                        <!--<td><textarea name="reason[]" rows="1" class="ti-form-input w-full">Penambahan produk baru</textarea></td>-->
+                                                        <td><button type="button" class="ti-btn ti-btn-danger" onclick="hapusBaris(this)"><i class="ri-delete-bin-line"></i></button></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        
+                                            <div class="mt-4">
+                                                <button type="button" class="ti-btn ti-btn-secondary" onclick="tambahBaris()">+ Tambah Baris</button>
                                             </div>
+                                        
                                             <div class="flex justify-end mt-6">
-                                                <button type="submit" id="submitBtn" class="ti-btn ti-btn-primary اداکار-wave !font-medium"><i class="ri-add-circle-line ltr:mr-1 rtl:ml-1"></i>Tambah Produk & Catat Stok</button>
+                                                <button type="submit" class="ti-btn ti-btn-primary">Tambah Semua Produk</button>
                                             </div>
                                         </form>
+
                                     </div>
                                 </div>
                             </div>
@@ -282,12 +276,16 @@ if ($pdo) {
                             <div class="xl:col-span-12 col-span-12">
                                 <div class="box">
                                     <div class="box-header">
-                                        <div class="box-title flex items-center">
+                                        <div class="box-title flex items-center justify-end p-4 gap-2">
                                             <i class="ri-history-line text-xl ltr:mr-2 rtl:ml-2"></i> Log Penambahan Barang Baru Terbaru
+                                        </div>
+                                        <div class="flex items-center justify-end p-4 gap-2">
+                                            <label for="filter-date" class="text-sm text-gray-700 dark:text-gray-300">Filter Tanggal:</label>
+                                            <input type="text" id="filter-date" class="border border-gray-300 dark:border-white/20 rounded px-3 py-2 text-sm dark:bg-black/20 dark:text-white" placeholder="Pilih tanggal" />
                                         </div>
                                     </div>
                                     <div class="box-body p-0">
-                                        <div class="overflow-x-auto">
+                                        <div class="overflow-x-auto max-h-[400px]">
                                             <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
                                                 <thead class="bg-gray-50 dark:bg-black/20">
                                                     <tr>
@@ -295,7 +293,7 @@ if ($pdo) {
                                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Produk (Kode)</th>
                                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Batch</th>
                                                         <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty Masuk</th>
-                                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Stok Akhir</th>
+                                                        
                                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Alasan</th>
                                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Oleh</th>
                                                     </tr>
@@ -313,7 +311,7 @@ if ($pdo) {
                                                             </td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white/70"><?= htmlspecialchars($movement['related_transaction_id']) /* Ini adalah batch number */ ?></td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right"><?= htmlspecialchars(number_format((float)$movement['quantity_changed'], 2, ',', '.')) ?></td>
-                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right"><?= htmlspecialchars(number_format((float)$movement['current_stock_after_movement'], 2, ',', '.')) ?></td>
+                                                            
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white/70"><?= nl2br(htmlspecialchars($movement['reason'])) ?></td>
                                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-white/70"><?= htmlspecialchars($movement['user_fullname'] ?? 'N/A') ?></td>
                                                         </tr>
@@ -326,72 +324,6 @@ if ($pdo) {
                                                 </tbody>
                                             </table>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tab 2: Tambah Stok Barang Tersedia -->
-                    <div id="content-tambah-stok" class="hidden" role="tabpanel" aria-labelledby="tab-tambah-stok">
-                        <div class="grid grid-cols-12 gap-x-6">
-                            <div class="xl:col-span-12 col-span-12">
-                                <div class="box">
-                                    <div class="box-header">
-                                        <div class="box-title flex items-center">
-                                            <i class="ri-stack-line text-xl ltr:mr-2 rtl:ml-2"></i> Tambah Stok Barang Tersedia
-                                        </div>
-                                    </div>
-                                    <div class="box-body p-6">
-                                         <?php if ($errorMessage && str_contains($errorMessage, "Kesalahan database")): ?>
-                                            <div class="mb-4 p-4 bg-red-100 text-red-700 border border-red-300 rounded-md" role="alert">
-                                                <i class="ri-error-warning-line ltr:mr-2 rtl:ml-2"></i><?php echo $errorMessage; ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <form action="../prosesdata/process_tambah_stok_existing.php" method="POST" id="tambahStokForm">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Pilih produk yang sudah ada untuk ditambahkan stoknya.</p>
-                                            
-                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-4">
-                                                <div>
-                                                    <label for="existing_product_id" class="ti-form-label">Produk <span class="text-red-500">*</span></label>
-                                                    <select class="ti-form-select" id="existing_product_id" name="product_id" required data-placeholder="Pilih Produk">
-                                                        <option value=""></option>
-                                                        <?php foreach ($existingProducts as $product): ?>
-                                                        <option value="<?= htmlspecialchars($product['product_id']) ?>" data-unit="<?= htmlspecialchars($product['unit']) ?>">
-                                                            <?= htmlspecialchars($product['product_name']) ?> <?= !empty($product['kode_item']) ? '(' . htmlspecialchars($product['kode_item']) . ')' : '' ?>
-                                                        </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label for="existing_stock_quantity" class="ti-form-label">Jumlah Stok Masuk <span class="text-red-500">*</span></label>
-                                                    <div class="flex items-center">
-                                                        <input type="number" step="any" class="ti-form-input" id="existing_stock_quantity" name="stock_quantity" required min="0.01" placeholder="Jumlah stok">
-                                                        <span id="existing_product_unit_display" class="ltr:ml-2 rtl:mr-2 text-sm text-gray-500 dark:text-gray-400"></span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label for="existing_batch_number" class="ti-form-label">No. Batch</label>
-                                                    <input type="text" class="ti-form-input" id="existing_batch_number" name="batch_number" placeholder="Nomor batch produk">
-                                                </div>
-                                                <div>
-                                                    <label for="existing_expire_date" class="ti-form-label">Expire Date</label>
-                                                    <input type="text" class="ti-form-input flatpickr-date-existing" id="existing_expire_date" name="expire_date" placeholder="YYYY-MM-DD">
-                                                </div>
-                                                 <div>
-                                                    <label for="existing_cost_price" class="ti-form-label">Harga Modal (Opsional)</label>
-                                                    <input type="number" step="any" class="ti-form-input" id="existing_cost_price" name="cost_price" min="0" placeholder="0.00">
-                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Isi jika ada perubahan harga modal. Jika kosong, harga modal produk tidak diubah.</p>
-                                                </div>
-                                                <div class="md:col-span-2 lg:col-span-3">
-                                                    <label for="existing_reason" class="ti-form-label">Catatan/Alasan Penambahan <span class="text-red-500">*</span></label>
-                                                    <textarea class="ti-form-input" id="existing_reason" name="reason" rows="3" placeholder="Masukkan alasan atau catatan untuk penambahan stok..." required></textarea>
-                                                </div>
-                                            </div>
-                                            <div class="flex justify-end mt-6">
-                                                <button type="submit" id="submitStokBtn" class="ti-btn ti-btn-success اداکار-wave !font-medium"><i class="ri-add-circle-line ltr:mr-1 rtl:ml-1"></i>Tambah Stok</button>
-                                            </div>
-                                        </form>
                                     </div>
                                 </div>
                             </div>
@@ -422,138 +354,33 @@ if ($pdo) {
     <script src="../assets/libs/simplebar/simplebar.min.js"></script>
     <script src="../assets/js/simplebar.js"></script>
     <script src="../assets/js/custom.js"></script>
+    <script src="../assets/js/auto_format_date_input_baru.js"></script>
     <script src="../assets/js/custom-switcher.min.js"></script>
-
+    <script src="../assets/js/setting_input.js"> </script>
     <script>
-        $(document).ready(function() {
-            // Initialize Select2 for all basic selects
-            $('.select2-basic').each(function () {
-                var $this = $(this);
-                $this.select2({
-                    placeholder: $this.data('placeholder') || 'Pilih salah satu',
-                    allowClear: true,
-                    width: '100%',
-                    dropdownParent: $this.closest('.box-body') // Ensure dropdown is within the modal/box
-                });
-            });
-            
-            // Initialize Select2 for the "Tambah Stok Barang Tersedia" tab's product dropdown
-            $('#existing_product_id').select2({
-                placeholder: 'Pilih Produk',
-                allowClear: true,
-                width: '100%',
-                dropdownParent: $('#existing_product_id').closest('.box-body')
-            });
-
-
-            // Initialize Flatpickr for all date inputs
-            flatpickr(".flatpickr-date", { // For "Tambah Barang Baru" tab
-                altInput: true, 
-                altFormat: "d M Y", 
-                dateFormat: "Y-m-d", 
-                allowInput: true, 
-                locale: "id" 
-            });
-            flatpickr(".flatpickr-date-existing", { // For "Tambah Stok Barang Tersedia" tab
-                altInput: true, 
-                altFormat: "d M Y", 
-                dateFormat: "Y-m-d", 
-                allowInput: true, 
-                locale: "id" 
-            });
-
-
-            // Barcode validation for "Tambah Barang Baru" tab
-            $('#barcode').on('blur', function() {
-                var barcodeVal = $(this).val().trim();
-                var barcodeErrorDiv = $('#barcode_error');
-                var barcodeInput = $(this);
-                // var submitBtn = $('#submitBtn'); // Submit button disabling can be tricky with multiple validation points
-
-                barcodeInput.removeClass('is-invalid');
-                barcodeErrorDiv.text('');
-                // submitBtn.prop('disabled', false); 
-
-                if (barcodeVal !== '') {
-                    $.ajax({
-                        url: 'ajax_check_barcode.php', 
-                        type: 'POST',
-                        data: { barcode: barcodeVal },
-                        dataType: 'json',
-                        success: function(response) {
-                            if (response.exists) {
-                                barcodeInput.addClass('is-invalid');
-                                barcodeErrorDiv.text('Barcode ini sudah terdaftar.');
-                                // submitBtn.prop('disabled', true); 
-                            }
-                        },
-                        error: function() {
-                            console.error("AJAX Barcode Check Error");
-                        }
-                    });
-                }
-            });
-
-            $('#barcode').on('input', function() {
-                if ($(this).hasClass('is-invalid')) {
-                    $(this).removeClass('is-invalid');
-                    $('#barcode_error').text('');
-                    // $('#submitBtn').prop('disabled', false);
-                }
-            });
-            
-            // AJAX Generate Kode Item Unik for "Tambah Barang Baru" tab
-            $('#btnGenerateKodeItem').on('click', function() {
-                var btn = $(this);
-                var kodeItemInput = $('#kode_item');
-                var kodeItemFeedback = $('#kode_item_feedback');
-
-                btn.prop('disabled', true).text('Generating...');
-                kodeItemFeedback.text('').removeClass('text-green-600 text-red-600');
-
-                $.ajax({
-                    url: 'ajax_generate_unique_kode_item.php', 
-                    type: 'GET',
-                    dataType: 'json',
-                    success: function(response) {
-                        if (response.success && response.kode_item) {
-                            kodeItemInput.val(response.kode_item);
-                        } else {
-                            kodeItemFeedback.text(response.message || 'Gagal men-generate kode item.').addClass('text-red-600');
-                            kodeItemInput.val('');
-                        }
-                    },
-                    error: function() {
-                        kodeItemFeedback.text('Terjadi kesalahan saat menghubungi server.').addClass('text-red-600');
-                        kodeItemInput.val('');
-                    },
-                    complete: function() {
-                        btn.prop('disabled', false).text('Generate');
-                    }
-                });
-            });
-
-            // Display unit for selected product in "Tambah Stok Barang Tersedia" tab
-            $('#existing_product_id').on('select2:select', function (e) {
-                var data = e.params.data;
-                var unit = $(data.element).data('unit');
-                if (unit) {
-                    $('#existing_product_unit_display').text(' ' + unit);
-                } else {
-                    $('#existing_product_unit_display').text(' ');
-                }
-            });
-             $('#existing_product_id').on('select2:clear', function (e) {
-                $('#existing_product_unit_display').text(' ');
-            });
-            if ($('#existing_product_id').val()) { // If a product is pre-selected (e.g. form resubmission)
-                 var selectedOption = $('#existing_product_id').find('option:selected');
-                 var unit = selectedOption.data('unit');
-                 if (unit) {
-                    $('#existing_product_unit_display').text('' + unit);
-                }
+    document.addEventListener('DOMContentLoaded', function () {
+        flatpickr("#filter-date", {
+            dateFormat: "d M Y",
+            onChange: function(selectedDates, dateStr) {
+                filterTableByDate(dateStr);
             }
         });
-    </script>
+
+        function filterTableByDate(selectedDate) {
+            const rows = document.querySelectorAll("tbody tr");
+            rows.forEach(row => {
+                const dateCell = row.querySelector("td:first-child");
+                if (!dateCell) return;
+
+                const rowDate = dateCell.textContent.trim().substring(0, 11); // contoh: "22 Mei 2025"
+                if (!selectedDate || rowDate === selectedDate) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        }
+    });
+</script>
 </body>
 </html>
