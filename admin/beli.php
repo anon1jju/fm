@@ -201,16 +201,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             position: relative; /* For positioning the results dropdown */
         }
         .product-search-results {
-            position: absolute;
-            background-color: white;
-            border: 1px solid #ddd;
-            border-top: none;
-            z-index: 1000; /* Ensure it's above other elements */
-            width: 200%; /* Match input width */
-            max-height: 300px;
-            overflow-y: auto;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
+             position: absolute;
+             background-color: white;
+             border: 1px solid #ddd;
+             border-top: none;
+             z-index: 1001; /* Ensure it's above other elements */
+             width: 200%; /* Match input width */
+             max-height: 300px;
+             overflow-y: auto;
+             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+         }
         .product-search-results div {
             padding: 8px 12px;
             cursor: pointer;
@@ -359,55 +359,76 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     </div>
                                     
                                     <hr class="my-6">
-                                    <h3 class="text-xl font-semibold mb-4">Status & Catatan</h3>
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                                        <div>
-                                            <label for="payment_status" class="form-label">Status Pembayaran</label>
-                                            <select id="payment_status" name="payment_status" class="ti-form-select">
-                                                <option value="hutang" <?php echo (isset($_POST['payment_status']) && $_POST['payment_status'] == 'hutang' ? 'selected' : (!isset($_POST['payment_status']) ? 'selected' : '')); ?>>Hutang</option>
-                                                <option value="cicil" <?php echo (isset($_POST['payment_status']) && $_POST['payment_status'] == 'cicil' ? 'selected' : ''); ?>>Cicil</option>
-                                                <option value="lunas" <?php echo (isset($_POST['payment_status']) && $_POST['payment_status'] == 'lunas' ? 'selected' : ''); ?>>Lunas</option>
-                                            </select>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                    <div>
+                                        <h3 class="text-xl font-semibold mb-4">Status & Catatan</h3>
+                                        <div class="space-y-4">
+                                            <div>
+                                                <label for="payment_status" class="form-label">Status Pembayaran</label>
+                                                <select id="payment_status" name="payment_status" class="ti-form-select">
+                                                    <option value="hutang" <?php echo (isset($_POST['payment_status']) && $_POST['payment_status'] == 'hutang' ? 'selected' : (!isset($_POST['payment_status']) ? 'selected' : '')); ?>>Hutang</option>
+                                                    <option value="cicil" <?php echo (isset($_POST['payment_status']) && $_POST['payment_status'] == 'cicil' ? 'selected' : ''); ?>>Cicil</option>
+                                                    <option value="lunas" <?php echo (isset($_POST['payment_status']) && $_POST['payment_status'] == 'lunas' ? 'selected' : ''); ?>>Lunas</option>
+                                                </select>
+                                            </div>
+                                
+                                            <div class="flex flex-col md:flex-row gap-4 items-end">
+                                                <div class="w-full md:w-1/2">
+                                                    <label for="due_days" class="form-label text-sm">Hari J.Tempo</label>
+                                                    <input type="tel" class="ti-form-input text-center" id="due_days" name="due_days"
+                                                        value="<?php echo isset($_POST['due_days']) ? htmlspecialchars($_POST['due_days']) : '30'; ?>" min="0">
+                                                </div>
+                                            
+                                                <div class="w-full md:w-1/2">
+                                                    <label for="due_date" class="form-label text-sm">Tgl. Jatuh Tempo</label>
+                                                    <input type="text" class="ti-form-input flatpickr-date" id="due_date" name="due_date"
+                                                        placeholder="Otomatis/Manual" value="<?php
+                                                            $display_due_date_form = '';
+                                                            if (isset($_POST['due_date']) && !empty($_POST['due_date'])) {
+                                                                $display_due_date_form = $_POST['due_date'];
+                                                            } else if (isset($_POST['purchase_date'], $_POST['due_days'])) {
+                                                                try {
+                                                                    $pd_form = $_POST['purchase_date'];
+                                                                    $dd_form = (int)$_POST['due_days'];
+                                                                    if ($dd_form >= 0) {
+                                                                        $date_obj_form = new DateTime($pd_form);
+                                                                        $date_obj_form->add(new DateInterval("P{$dd_form}D"));
+                                                                        $display_due_date_form = $date_obj_form->format('Y-m-d');
+                                                                    }
+                                                                } catch (Exception $e) { }
+                                                            } else {
+                                                                try {
+                                                                    $pd_form = date('Y-m-d');
+                                                                    $dd_form = 30;
+                                                                    $date_obj_form = new DateTime($pd_form);
+                                                                    $date_obj_form->add(new DateInterval("P{$dd_form}D"));
+                                                                    $display_due_date_form = $date_obj_form->format('Y-m-d');
+                                                                } catch (Exception $e) { }
+                                                            }
+                                                            echo htmlspecialchars($display_due_date_form);
+                                                        ?>">
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label for="notes" class="form-label">Catatan</label>
+                                                <textarea class="ti-form-input" id="notes" name="notes" rows="3"><?php echo isset($_POST['notes']) ? htmlspecialchars($_POST['notes']) : ''; ?></textarea>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label for="due_days" class="form-label text-sm">Hari J.Tempo</label>
-                                            <input type="tel" class="ti-form-input text-center" id="due_days" name="due_days" value="<?php echo isset($_POST['due_days']) ? htmlspecialchars($_POST['due_days']) : '30'; ?>" min="0">
-                                        </div>
-                                        <div>
-                                            <label for="due_date" class="form-label text-sm">Tgl. Jatuh Tempo</label>
-                                            <input type="text" class="ti-form-input flatpickr-date" id="due_date" name="due_date" placeholder="Otomatis/Manual" value="<?php
-                                                // Logic to prefill due_date based on purchase_date and due_days if not set in POST
-                                                $display_due_date_form = '';
-                                                if (isset($_POST['due_date']) && !empty($_POST['due_date'])) {
-                                                    $display_due_date_form = $_POST['due_date'];
-                                                } else if (isset($_POST['purchase_date'], $_POST['due_days'])) {
-                                                    try {
-                                                        $pd_form = $_POST['purchase_date'];
-                                                        $dd_form = (int)$_POST['due_days'];
-                                                        if ($dd_form >=0 ) {
-                                                            $date_obj_form = new DateTime($pd_form);
-                                                            $date_obj_form->add(new DateInterval("P{$dd_form}D"));
-                                                            $display_due_date_form = $date_obj_form->format('Y-m-d');
-                                                        }
-                                                    } catch (Exception $e) { /* Kosongkan jika error */ }
-                                                } else { // Default if nothing is set
-                                                    try {
-                                                        $pd_form = date('Y-m-d');
-                                                        $dd_form = 30;
-                                                        $date_obj_form = new DateTime($pd_form);
-                                                        $date_obj_form->add(new DateInterval("P{$dd_form}D"));
-                                                        $display_due_date_form = $date_obj_form->format('Y-m-d');
-                                                    } catch (Exception $e) { /* Kosongkan jika error */ }
-                                                }
-                                                echo htmlspecialchars($display_due_date_form);
-                                            ?>">
-                                        </div>
-                                    </div>
-                                    <div class="mt-6">
-                                        <label for="notes" class="form-label">Catatan</label>
-                                        <textarea class="ti-form-input" id="notes" name="notes" rows="3"><?php echo isset($_POST['notes']) ? htmlspecialchars($_POST['notes']) : ''; ?></textarea>
                                     </div>
 
+                                    <!-- Kolom Kanan: Form Cicil (kosong dulu atau bisa kamu isi form-nya) -->
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label for="installment_total" class="form-label">Cicil</label>
+                                            <input type="number" class="ti-form-input" id="installment_total" name="installment_total" min="1" value="<?php echo isset($_POST['installment_total']) ? htmlspecialchars($_POST['installment_total']) : ''; ?>" placeholder="Nominal harga">
+                                        </div>
+                                    
+                                        <div>
+                                            <label for="installment_start_date" class="form-label">Sisa Hutang</label>
+                                            <input type="text" class="ti-form-input" id="installment_start_date" name="installment_start_date" value="<?php echo isset($_POST['installment_start_date']) ? htmlspecialchars($_POST['installment_start_date']) : ''; ?>" readonly>
+                                        </div>
+                                    </div>
                                     <div class="mt-8 flex justify-end">
                                         <button type="submit" class="ti-btn ti-btn-primary">Simpan Pembelian</button>
                                         <a href="beli.php" class="ti-btn ti-btn-light ms-2">Batal</a>
@@ -454,6 +475,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         });
     });
     </script>
+    
+    <script>
+        document.getElementById('payment_status').addEventListener('change', function () {
+            const cicilSection = document.getElementById('cicil-section');
+            if (this.value === 'cicil') {
+                cicilSection.classList.remove('hidden');
+            } else {
+                cicilSection.classList.add('hidden');
+            }
+        });
+    
+        // Jalankan saat load untuk menyembunyikan jika bukan cicil
+        window.addEventListener('DOMContentLoaded', () => {
+            const status = document.getElementById('payment_status').value;
+            const cicilSection = document.getElementById('cicil-section');
+            if (status !== 'cicil') {
+                cicilSection.classList.add('hidden');
+            }
+        });
+    </script>
+
 
     <!-- Select2 JS is removed as it's not used for product search -->
 
