@@ -166,6 +166,253 @@ class Farmamedika
             return null;
         }
     }
+    
+        /**
+     * Melakukan stok opname untuk satu produk tertentu
+     * 
+     * @param int $product_id ID produk yang akan di-opname
+     * @param float $actual_stock Jumlah stok aktual setelah penghitungan fisik
+     * @param int $user_id ID pengguna yang melakukan stok opname
+     * @param string $reason Alasan dilakukannya penyesuaian stok (opsional)
+     * @param string $related_transaction_id ID transaksi terkait (opsional)
+     * @return array Hasil operasi (success, message, dll)
+     */
+    public function performStockOpname($product_id, $actual_stock, $user_id, $reason = "Stok Opname Rutin", $related_transaction_id = null)
+    {
+        if (!$this->pdo) {
+            error_log("performStockOpname Error: No valid PDO connection.");
+            return ['success' => false, 'message' => 'Koneksi database gagal.'];
+        }
+    
+        try {
+            // Begin transaction
+            $this->pdo->beginTransaction();
+    
+            // Get current stock from products table
+            $stmt = $this->pdo->prepare("SELECT product_id, product_name, stock_quantity FROM products WHERE product_id = :product_id FOR UPDATE");
+            $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+            if (!$product) {
+                $this->pdo->rollBack();
+                return ['success' => false, 'message' => 'Produk tidak ditemukan.'];
+            }
+    
+            $current_stock = (float)$product['stock_quantity'];
+            $difference = (float)$actual_stock - $current_stock;
+    
+            // Jika tidak ada perbedaan, tidak perlu penyesuaian
+            if ($difference == 0) {
+                $this->pdo->rollBack();
+                return [
+                    'success' => true, 
+                    'message' => 'Stok fisik sesuai dengan stok sistem, tidak ada penyesuaian yang diperlukan.',
+                    'product_name' => $product['product_name'],
+                    'system_stock' => $current_stock,
+                    'actual_stock' => $actual_stock,
+                    'difference' => $difference
+                ];
+            }
+    
+            // Tentukan jenis pergerakan berdasarkan perbedaan
+            $movement_type = $difference > 0 ? 'penyesuaian_stok' : 'penyesuaian_stok';
+            $abs_difference = abs($difference);
+            
+            // Catat pergerakan stok
+            $stmt = $this->pdo->prepare("INSERT INTO stock_movements 
+                                        (product_id, current_stock_before_movement, movement_type, 
+                                         quantity_changed, current_stock_after_movement, user_id, 
+                                         reason, related_transaction_id)
+                                        VALUES 
+                                        (:product_id, :current_stock_before, :movement_type, 
+                                         :quantity_changed, :current_stock_after, :user_id, 
+                                         :reason, :related_transaction_id)");
+            
+            $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+            $stmt->bindParam(':current_stock_before', $current_stock);
+            $stmt->bindParam(':movement_type', $movement_type);
+            $stmt->bindParam(':quantity_changed', $difference);
+            $stmt->bindParam(':current_stock_after', $actual_stock);
+            $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':reason', $reason);
+            $stmt->bindParam(':related_transaction_id', $related_transaction_id);
+            $stmt->execute();
+    
+            // Update stok produk
+            $stmt = $this->pdo->prepare("UPDATE products SET stock_quantity = :new_stock WHERE product_id = :product_id");
+            $stmt->bindParam(':new_stock', $actual_stock);
+            $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+            $stmt->execute();
+    
+            // Log aktivitas
+            $adjustmentType = $difference > 0 ? "penambahan" : "pengurangan";
+            $logMessage = "Stok opname: {$adjustmentType} {$abs_difference} untuk produk {$product['product_name']} (ID: {$product_id}). Stok sistem: {$current_stock}, stok aktual: {$actual_stock}";
+            $this->logActivity($user_id, 'STOCK_OPNAME', $logMessage);
+    
+            $this->pdo->commit();
+    
+            return [
+                'success' => true,
+                'message' => "Stok opname berhasil. {$adjustmentType} stok sebanyak {$abs_difference}.",
+                'product_name' => $product['product_name'],
+                'system_stock' => $current_stock,
+                'actual_stock' => $actual_stock,
+                'difference' => $difference
+            ];
+    
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log("PDO Error (performStockOpname): " . $e->getMessage());
+            return ['success' => false, 'message' => 'Gagal melakukan stok opname: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Melakukan stok opname secara batch untuk multiple produk
+     * 
+     * @param array $stockOpnameData Array berisi data stok opname: [['product_id' => X, 'actual_stock' => Y], ...]
+     * @param int $user_id ID pengguna yang melakukan stok opname
+     * @param string $reason Alasan dilakukannya penyesuaian stok (opsional)
+     * @return array Hasil operasi (success, results)
+     */
+    public function performBatchStockOpname($stockOpnameData, $user_id, $reason = "Stok Opname Rutin")
+    {
+        if (!$this->pdo) {
+            error_log("performBatchStockOpname Error: No valid PDO connection.");
+            return ['success' => false, 'message' => 'Koneksi database gagal.'];
+        }
+        
+        $results = [
+            'success' => true,
+            'total_items' => count($stockOpnameData),
+            'adjusted_items' => 0,
+            'accurate_items' => 0,
+            'failed_items' => 0,
+            'details' => []
+        ];
+    
+        try {
+            // Begin transaction for all operations
+            $this->pdo->beginTransaction();
+            
+            $opnameDate = date('Y-m-d H:i:s');
+            $related_transaction_id = "BATCH_OPNAME_" . date('YmdHis');
+            
+            foreach ($stockOpnameData as $item) {
+                if (!isset($item['product_id']) || !isset($item['actual_stock'])) {
+                    $results['failed_items']++;
+                    $results['details'][] = [
+                        'product_id' => $item['product_id'] ?? 'unknown',
+                        'success' => false,
+                        'message' => 'Data produk tidak lengkap.'
+                    ];
+                    continue;
+                }
+                
+                $itemResult = $this->performStockOpname(
+                    $item['product_id'],
+                    $item['actual_stock'],
+                    $user_id,
+                    $reason,
+                    $related_transaction_id
+                );
+                
+                if ($itemResult['success']) {
+                    if (isset($itemResult['difference']) && $itemResult['difference'] != 0) {
+                        $results['adjusted_items']++;
+                    } else {
+                        $results['accurate_items']++;
+                    }
+                } else {
+                    $results['failed_items']++;
+                }
+                
+                $results['details'][] = [
+                    'product_id' => $item['product_id'],
+                    'product_name' => $itemResult['product_name'] ?? null,
+                    'system_stock' => $itemResult['system_stock'] ?? null,
+                    'actual_stock' => $itemResult['actual_stock'] ?? null,
+                    'difference' => $itemResult['difference'] ?? null,
+                    'success' => $itemResult['success'],
+                    'message' => $itemResult['message']
+                ];
+            }
+            
+            $this->pdo->commit();
+            
+            // Log aktivitas batch
+            $logMessage = "Stok opname batch: {$results['adjusted_items']} item disesuaikan, {$results['accurate_items']} item akurat, {$results['failed_items']} item gagal.";
+            $this->logActivity($user_id, 'BATCH_STOCK_OPNAME', $logMessage);
+            
+            $results['message'] = "Stok opname batch selesai. {$results['adjusted_items']} item disesuaikan, {$results['accurate_items']} item akurat, {$results['failed_items']} item gagal.";
+            return $results;
+            
+        } catch (PDOException $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            error_log("PDO Error (performBatchStockOpname): " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Gagal melakukan stok opname batch: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Mendapatkan riwayat stok opname dalam periode tertentu
+     * 
+     * @param string $startDate Tanggal mulai (YYYY-MM-DD)
+     * @param string $endDate Tanggal akhir (YYYY-MM-DD)
+     * @return array Riwayat stok opname
+     */
+    public function getStockOpnameHistory($startDate = null, $endDate = null)
+    {
+        if (!$this->pdo) {
+            error_log("getStockOpnameHistory Error: No valid PDO connection.");
+            return [];
+        }
+        
+        try {
+            $query = "SELECT sm.*, p.product_name, p.kode_item, u.name as user_name
+                      FROM stock_movements sm
+                      JOIN products p ON sm.product_id = p.product_id
+                      LEFT JOIN users u ON sm.user_id = u.user_id
+                      WHERE sm.movement_type = 'penyesuaian_stok'";
+            
+            $params = [];
+            
+            if ($startDate && $endDate) {
+                $query .= " AND DATE(sm.movement_date) BETWEEN :start_date AND :end_date";
+                $params[':start_date'] = $startDate;
+                $params[':end_date'] = $endDate;
+            } elseif ($startDate) {
+                $query .= " AND DATE(sm.movement_date) >= :start_date";
+                $params[':start_date'] = $startDate;
+            } elseif ($endDate) {
+                $query .= " AND DATE(sm.movement_date) <= :end_date";
+                $params[':end_date'] = $endDate;
+            }
+            
+            $query .= " ORDER BY sm.movement_date DESC";
+            
+            $stmt = $this->pdo->prepare($query);
+            
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+        } catch (PDOException $e) {
+            error_log("Database Error (getStockOpnameHistory): " . $e->getMessage());
+            return [];
+        }
+    }
 
 
     /**
@@ -204,7 +451,7 @@ class Farmamedika
         return $this->updateInvoicePayment($invoice_id, $new_total_paid_for_invoice, $new_invoice_status);
     }
 
-}
+
     
     /**
      * Fungsi untuk membuat nomor invoice
@@ -294,7 +541,7 @@ class Farmamedika
  * @param int $userId ID user yang melakukan aksi (opsional, untuk logging)
  * @return array Hasil operasi (success, message)
  */
-public function addPurchasePayment($purchase_id, $data, $userId = null)
+/*public function addPurchasePayment($purchase_id, $data, $userId = null)
 {
     if (!$this->pdo) {
         error_log("addPurchasePayment Error: No valid PDO connection.");
@@ -379,6 +626,69 @@ public function addPurchasePayment($purchase_id, $data, $userId = null)
         }
         error_log("PDO Error (addPurchasePayment): " . $e->getMessage());
         return ['success' => false, 'message' => 'Gagal menambahkan pembayaran: ' . $e->getMessage()];
+    }
+}*/
+
+// In functions.php (Farma class) - MODIFIED
+public function addPurchasePayment($purchase_id, $payment_data, $user_id) {
+    // No $this->pdo->beginTransaction(), commit(), or rollBack() here.
+    // It will operate within the transaction started by beli.php.
+
+    try {
+        // 1. Insert into purchase_payments table
+        $sql_payment = "INSERT INTO purchase_payments (purchase_id, payment_date, amount_paid, payment_method, reference, proof_document_path, created_at) 
+                        VALUES (:purchase_id, :payment_date, :amount_paid, :payment_method, :reference, :proof_document_path, NOW())";
+        $stmt_payment = $this->pdo->prepare($sql_payment);
+        // Bind all necessary parameters, including $user_id
+        $stmt_payment->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+       // $stmt_payment->bindParam(':user_id', $user_id, PDO::PARAM_INT); // Ensure $user_id is available and bound
+        $stmt_payment->bindParam(':payment_date', $payment_data['payment_date']);
+        $stmt_payment->bindParam(':amount_paid', $payment_data['amount_paid']);
+        $stmt_payment->bindParam(':payment_method', $payment_data['payment_method']);
+        $stmt_payment->bindParam(':reference', $payment_data['reference']);
+        $stmt_payment->bindParam(':proof_document_path', $payment_data['proof_document_path']);
+        $stmt_payment->execute();
+
+        // 2. Update payment_status and total_amount_paid in purchases table
+        // (This logic should already be in your addPurchasePayment or a related function)
+        $sql_sum = "SELECT SUM(amount_paid) as total_paid FROM purchase_payments WHERE purchase_id = :purchase_id";
+        $stmt_sum = $this->pdo->prepare($sql_sum);
+        $stmt_sum->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_sum->execute();
+        $total_paid = $stmt_sum->fetchColumn();
+        if ($total_paid === null) $total_paid = 0;
+
+
+        $sql_purchase_info = "SELECT total_amount FROM purchases WHERE purchase_id = :purchase_id";
+        $stmt_purchase_info = $this->pdo->prepare($sql_purchase_info);
+        $stmt_purchase_info->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_purchase_info->execute();
+        $purchase = $stmt_purchase_info->fetch(PDO::FETCH_ASSOC);
+        $total_amount = $purchase ? $purchase['total_amount'] : 0;
+
+        $new_payment_status = 'hutang'; 
+        if ((float)$total_paid >= (float)$total_amount) {
+            $new_payment_status = 'lunas';
+        } elseif ((float)$total_paid > 0) {
+            $new_payment_status = 'cicil';
+        }
+
+        $sql_update_purchase = "UPDATE purchases SET amount_already_paid = :total_paid, payment_status = :payment_status, updated_at = NOW() 
+                                WHERE purchase_id = :purchase_id";
+        $stmt_update_purchase = $this->pdo->prepare($sql_update_purchase);
+        $stmt_update_purchase->bindParam(':total_paid', $total_paid);
+        $stmt_update_purchase->bindParam(':payment_status', $new_payment_status);
+        $stmt_update_purchase->bindParam(':purchase_id', $purchase_id, PDO::PARAM_INT);
+        $stmt_update_purchase->execute();
+        
+        // If successful, just return true or a success indicator.
+        // The message can be constructed in beli.php
+        return true; 
+
+    } catch (Exception $e) {
+        // IMPORTANT: Re-throw the exception.
+        // This allows the outer try-catch block in beli.php to catch it and roll back the main transaction.
+        throw $e;
     }
 }
 
@@ -1345,69 +1655,149 @@ public function getProductsForPurchaseForm()
     }
     
         public function checkPersistentSession()
+        {
+            // Periksa apakah sudah ada session aktif
+            if (isset($_SESSION['user_id'])) {
+                return true; // Pengguna sudah login
+            }
+    
+            // Periksa cookie persistent_session
+            if (isset($_COOKIE['persistent_session'])) {
+                try {
+                    $encryptedData = $_COOKIE['persistent_session'];
+                    // Penting: Tangani potensi error saat decoding
+                    $decodedData = base64_decode($encryptedData, true); 
+                    if ($decodedData === false) {
+                         // Tangani error base64 decode, mungkin hapus cookie
+                         setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                         return false;
+                    }
+    
+                    $sessionData = json_decode($decodedData, true);
+                    // Periksa error JSON decode
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                         // Tangani error JSON decode, mungkin hapus cookie
+                         setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                         return false;
+                    }
+    
+                    // Periksa apakah data yang diperlukan ada setelah decoding berhasil
+                    if ($sessionData && isset($sessionData['user_id'])) {
+                        
+                        // --- PERBAIKAN ---
+                        // Gunakan data dari $sessionData, bukan $user
+                        $_SESSION['user_id'] = $sessionData['user_id']; 
+    
+                        // Pastikan data ini ADA di dalam cookie Anda saat login
+                        // (Fungsi loginUser Anda sudah menyimpannya)
+                        if (isset($sessionData['username'])) {
+                            $_SESSION['username'] = $sessionData['username'];
+                        }
+                        if (isset($sessionData['role'])) {
+                            $_SESSION['role'] = $sessionData['role'];
+                        }
+                         if (isset($sessionData['name'])) {
+                            $_SESSION['name'] = $sessionData['name'];
+                        }
+                        // --- AKHIR PERBAIKAN ---
+    
+                        // Penting: Regenerate session ID setelah login (dari cookie atau form)
+                        // untuk mencegah session fixation attacks
+                        session_regenerate_id(true); 
+    
+                        return true; // Pengguna berhasil login dari cookie
+                    } else {
+                        // Data cookie tidak valid atau tidak lengkap
+                        setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                    }
+                } catch (Exception $e) {
+                    // Log error jika terjadi exception saat proses cookie
+                    error_log("Error processing persistent session cookie: " . $e->getMessage());
+                    setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie bermasalah
+                }
+            }
+    
+            return false; // Tidak ada sesi aktif atau cookie valid
+        }
+        
+    /*public function checkPersistentSession()
     {
         // Periksa apakah sudah ada session aktif
         if (isset($_SESSION['user_id'])) {
             return true; // Pengguna sudah login
         }
-
+    
         // Periksa cookie persistent_session
         if (isset($_COOKIE['persistent_session'])) {
             try {
                 $encryptedData = $_COOKIE['persistent_session'];
-                // Penting: Tangani potensi error saat decoding
-                $decodedData = base64_decode($encryptedData, true); 
+                $decodedData = base64_decode($encryptedData, true);
                 if ($decodedData === false) {
-                     // Tangani error base64 decode, mungkin hapus cookie
-                     setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
-                     return false;
+                    // Tangani error base64 decode, hapus cookie
+                    $this->destroyPersistentSessionCookie();
+                    return false;
                 }
-
+    
                 $sessionData = json_decode($decodedData, true);
-                // Periksa error JSON decode
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                     // Tangani error JSON decode, mungkin hapus cookie
-                     setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
-                     return false;
+                    // Tangani error JSON decode, hapus cookie
+                    $this->destroyPersistentSessionCookie();
+                    return false;
                 }
-
-                // Periksa apakah data yang diperlukan ada setelah decoding berhasil
-                if ($sessionData && isset($sessionData['user_id'])) {
-                    
-                    // --- PERBAIKAN ---
-                    // Gunakan data dari $sessionData, bukan $user
-                    $_SESSION['user_id'] = $sessionData['user_id']; 
-
-                    // Pastikan data ini ADA di dalam cookie Anda saat login
-                    // (Fungsi loginUser Anda sudah menyimpannya)
-                    if (isset($sessionData['username'])) {
-                        $_SESSION['username'] = $sessionData['username'];
+    
+                // Periksa apakah data yang diperlukan dan IP address ada setelah decoding berhasil
+                if ($sessionData && isset($sessionData['user_id']) && isset($sessionData['ip_address'])) {
+                    // Verifikasi alamat IP
+                    if ($sessionData['ip_address'] === $this->getUserIP()) {
+                        // Gunakan data dari $sessionData untuk mengisi $_SESSION
+                        $_SESSION['user_id'] = $sessionData['user_id'];
+                        if (isset($sessionData['username'])) {
+                            $_SESSION['username'] = $sessionData['username'];
+                        }
+                        if (isset($sessionData['role'])) {
+                            $_SESSION['role'] = $sessionData['role'];
+                        }
+                        if (isset($sessionData['name'])) {
+                            $_SESSION['name'] = $sessionData['name'];
+                        }
+    
+                        // Regenerate session ID setelah login dari cookie
+                        session_regenerate_id(true);
+                        return true; // Pengguna berhasil login dari cookie
+                    } else {
+                        // Alamat IP tidak cocok, hapus cookie
+                        $this->destroyPersistentSessionCookie();
+                        return false;
                     }
-                    if (isset($sessionData['role'])) {
-                        $_SESSION['role'] = $sessionData['role'];
-                    }
-                     if (isset($sessionData['name'])) {
-                        $_SESSION['name'] = $sessionData['name'];
-                    }
-                    // --- AKHIR PERBAIKAN ---
-
-                    // Penting: Regenerate session ID setelah login (dari cookie atau form)
-                    // untuk mencegah session fixation attacks
-                    session_regenerate_id(true); 
-
-                    return true; // Pengguna berhasil login dari cookie
                 } else {
                     // Data cookie tidak valid atau tidak lengkap
-                    setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie tidak valid
+                    $this->destroyPersistentSessionCookie();
                 }
             } catch (Exception $e) {
                 // Log error jika terjadi exception saat proses cookie
                 error_log("Error processing persistent session cookie: " . $e->getMessage());
-                setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie bermasalah
+                $this->destroyPersistentSessionCookie();
             }
         }
-
+    
         return false; // Tidak ada sesi aktif atau cookie valid
+    }*/
+    
+    private function getUserIP()
+    {
+        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+            $ip = $_SERVER['HTTP_CLIENT_IP'];
+        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        } else {
+            $ip = $_SERVER['REMOTE_ADDR'];
+        }
+        return $ip;
+    }
+    
+    private function destroyPersistentSessionCookie()
+    {
+        setcookie('persistent_session', '', time() - 3600, "/", "", true, true); // Hapus cookie
     }
     
     public function logoutUser()
@@ -1732,7 +2122,7 @@ public function getProductsForPurchaseForm()
     
     public function daysUntilExpire($expire_date) 
     {
-        $current_date = date('Y-m-d'); // Tanggal hari ini
+        $current_date = date('d-m-Y'); // Tanggal hari ini
 
         // Menghitung selisih antara tanggal sekarang dan tanggal expired
         $expire_timestamp = strtotime($expire_date);
@@ -2153,7 +2543,7 @@ public function getProductsForPurchaseForm()
                 DailyCOGS AS (
                     SELECT
                         DATE(s.sale_date) as sale_day,
-                        SUM(si.quantity * p.cost_price) as daily_cogs
+                        SUM(si.display_quantity * p.cost_price / 10) as daily_cogs
                     FROM
                         sales s
                     JOIN
@@ -2447,12 +2837,12 @@ public function getProductsForPurchaseForm()
                     '</span>
                         </td>
                         <td>' .
-                    $item['quantity'] .
+                    $item['display_quantity'] .
                     ' ' .
-                    $item['unit'] .
+                    $item['selected_unit'] .
                     '</td>
                         <td style="text-align: right;">Rp ' .
-                    number_format($item['unit_price'], 0, ',', '.') .
+                    number_format($item['item_total']/$item['display_quantity'], 0, ',', '.') .
                     '</td>
                         <td style="text-align: right;">Rp ' .
                     number_format($item['item_total'], 0, ',', '.') .
