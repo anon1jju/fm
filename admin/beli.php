@@ -311,7 +311,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <div class="flex justify-between items-center mb-4">
                                         <h3 class="text-xl font-semibold">Item Pembelian</h3>
                                     </div> 
-                                    <div id="purchaseItemsSectionWrapper" class="max-h-[700px] border border-gray-300 dark:border-gray-700 rounded-md mb-4">
+                                    <div id="purchaseItemsSectionWrapper" class="max-h-[500px] border border-gray-300 dark:border-gray-700 rounded-md mb-4">
                                         <table class="min-w-full divide-y divide-gray-200 border border-gray-200 dark:border-gray-700 rounded-md mb-4">
                                             <thead class="bg-gray-200 dark:bg-gray-800">
                                                 <tr>
@@ -541,35 +541,102 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (expiryInput && expiryInput._flatpickr) { expiryInput._flatpickr.clear(); } else if (expiryInput) { expiryInput.value = ''; }
             updateItemTotal(rowElement);
         }
-        function initializeProductSearch(rowElement) { /* ... JavaScript ... */ 
-            const searchInput = rowElement.querySelector('.product-search-input');
-            const resultsContainer = rowElement.querySelector('.product-search-results');
-            const hiddenIdInput = rowElement.querySelector('.actual-product-id');
-            searchInput.addEventListener('input', function() {
-                const term = this.value.toLowerCase();
-                resultsContainer.innerHTML = '';
-                if (term.length < 1) { resultsContainer.style.display = 'none'; return; }
-                const filteredProducts = productsList.filter(p => p.product_name.toLowerCase().includes(term) || (p.barcode && p.barcode.toLowerCase().includes(term)) || (p.product_code && p.product_code.toLowerCase().includes(term)));
-                if (filteredProducts.length > 0) {
-                    filteredProducts.forEach(product => {
-                        const div = document.createElement('div');
-                        div.innerHTML = `<span class="result-name">${product.product_name}</span> <span class="result-details">(BC: ${product.barcode || 'N/A'}, Stok: ${product.stock_quantity || 0}, Beli: ${product.cost_price || 0}, Jual: ${product.price || 0})</span>`;
-                        div.addEventListener('click', function() {
-                            searchInput.value = product.product_name; hiddenIdInput.value = product.product_id; resultsContainer.innerHTML = ''; resultsContainer.style.display = 'none';
-                            rowElement.querySelector('input[name="purchase_price[]"]').value = product.cost_price !== undefined ? product.cost_price : '';
-                            rowElement.querySelector('input[name="sell_price[]"]').value = product.price !== undefined ? product.price : '';
-                            rowElement.querySelector('input[name="batch_number[]"]').value = product.default_batch_number || '';
-                            const expiryDateInputEl = rowElement.querySelector('input[name="expiry_date[]"]');
-                            if (expiryDateInputEl) { if (product.default_expiry_date && expiryDateInputEl._flatpickr) { expiryDateInputEl._flatpickr.setDate(product.default_expiry_date, true); } else if (product.default_expiry_date) { expiryDateInputEl.value = product.default_expiry_date; } else if (expiryDateInputEl._flatpickr) { expiryDateInputEl._flatpickr.clear(); } else { expiryDateInputEl.value = ''; }}
-                            updateItemTotal(rowElement);
-                        });
-                        resultsContainer.appendChild(div);
-                    });
-                    resultsContainer.style.display = 'block';
-                } else { resultsContainer.innerHTML = '<div>Produk tidak ditemukan</div>'; resultsContainer.style.display = 'block'; }
-            });
-            document.addEventListener('click', function(event) { if (searchInput && resultsContainer && !searchInput.contains(event.target) && !resultsContainer.contains(event.target)) { resultsContainer.style.display = 'none'; } });
+        function initializeProductSearch(rowElement) {
+    const searchInput = rowElement.querySelector('.product-search-input');
+    const resultsContainer = rowElement.querySelector('.product-search-results');
+    const hiddenIdInput = rowElement.querySelector('.actual-product-id');
+    let currentFilteredProducts = []; // Variabel untuk menyimpan hasil filter terakhir
+
+    searchInput.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        resultsContainer.innerHTML = '';
+        currentFilteredProducts = []; // Reset hasil filter
+
+        if (term.length < 1) {
+            resultsContainer.style.display = 'none';
+            return;
         }
+
+        // Filter produk berdasarkan nama, barcode, atau kode produk
+        currentFilteredProducts = productsList.filter(p =>
+            p.product_name.toLowerCase().includes(term) ||
+            (p.barcode && String(p.barcode).toLowerCase().includes(term)) || // Pastikan barcode adalah string
+            (p.product_code && String(p.product_code).toLowerCase().includes(term)) // Pastikan product_code adalah string
+        );
+
+        if (currentFilteredProducts.length > 0) {
+            currentFilteredProducts.forEach(product => {
+                const div = document.createElement('div');
+                // Sesuaikan detail yang ditampilkan jika perlu
+                div.innerHTML = `<span class="result-name">${product.product_name}</span> <span class="result-details">(Kode: ${product.product_code || 'N/A'}, BC: ${product.barcode || 'N/A'}, Stok: ${product.stock_quantity || 0})</span>`;
+                
+                div.addEventListener('click', function() {
+                    searchInput.value = product.product_name;
+                    hiddenIdInput.value = product.product_id;
+                    resultsContainer.innerHTML = '';
+                    resultsContainer.style.display = 'none';
+
+                    rowElement.querySelector('input[name="purchase_price[]"]').value = product.cost_price !== undefined ? product.cost_price : '';
+                    rowElement.querySelector('input[name="sell_price[]"]').value = product.price !== undefined ? product.price : '';
+                    rowElement.querySelector('input[name="batch_number[]"]').value = product.default_batch_number || '';
+                    
+                    const expiryDateInputEl = rowElement.querySelector('input[name="expiry_date[]"]');
+                    if (expiryDateInputEl) {
+                        if (product.default_expiry_date && expiryDateInputEl._flatpickr) {
+                            expiryDateInputEl._flatpickr.setDate(product.default_expiry_date, true);
+                        } else if (expiryDateInputEl) { // Fallback jika flatpickr belum init
+                            expiryDateInputEl.value = product.default_expiry_date || '';
+                        }
+                    }
+                    updateItemTotal(rowElement);
+                    
+                    // Opsional: Pindahkan fokus ke input kuantitas setelah produk dipilih
+                    // const quantityInput = rowElement.querySelector('.quantity-input');
+                    // if (quantityInput) {
+                    //     quantityInput.focus();
+                    //     quantityInput.select(); // Pilih semua teks di input kuantitas
+                    // }
+                });
+                resultsContainer.appendChild(div);
+            });
+            resultsContainer.style.display = 'block';
+        } else {
+            resultsContainer.innerHTML = '<div>Produk tidak ditemukan</div>';
+            resultsContainer.style.display = 'block';
+        }
+    });
+
+    // Tambahan untuk menangani tombol "Enter" (umumnya dari barcode scanner)
+    searchInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            // Jika dropdown hasil terlihat dan hanya ada satu produk yang cocok
+            if (resultsContainer.style.display === 'block' && currentFilteredProducts.length === 1) {
+                event.preventDefault(); // Mencegah aksi default "Enter" (misalnya submit form)
+                
+                // Ambil div hasil pertama dan simulasikan klik
+                const firstResultDiv = resultsContainer.querySelector('div');
+                if (firstResultDiv && typeof firstResultDiv.click === 'function') {
+                    firstResultDiv.click();
+                }
+            } else if (resultsContainer.style.display === 'block' && currentFilteredProducts.length > 1) {
+                // Jika ada banyak hasil, cegah submit form tapi biarkan dropdown terbuka
+                // agar pengguna bisa memilih atau memperbaiki pencarian.
+                event.preventDefault();
+            }
+            // Jika tidak ada hasil atau dropdown tidak terlihat, biarkan "Enter" berperilaku normal.
+        }
+    });
+
+    // Sembunyikan dropdown jika klik di luar area pencarian
+    document.addEventListener('click', function(event) {
+        if (searchInput && resultsContainer && 
+            !searchInput.contains(event.target) && 
+            !resultsContainer.contains(event.target)) {
+            resultsContainer.style.display = 'none';
+        }
+    });
+}
+
         function attachRemoveButtonListener(button) { /* ... JavaScript ... */ 
             button.addEventListener('click', function () {
                 const itemRows = itemsContainer.querySelectorAll('.item-row');
