@@ -121,12 +121,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $stmt_update_product->bindParam(':product_id', $product_id_item, PDO::PARAM_INT);
                         $stmt_update_product->execute();
 
-                        if (!empty($batch_number_item)) { 
+                        //if (!empty($batch_number_item)) { 
+                        $batch_number_item = isset($batch_numbers_form[$key]) && !empty($batch_numbers_form[$key]) ? $batch_numbers_form[$key] : ''; // Jadi string kosong jika tidak diisi
+
                             // MODIFIKASI SQL DI SINI:
                             $sql_prod_batch = "INSERT INTO product_batches (product_id, supplier_id, batch_number, expiry_date, purchase_price, quantity, remaining_quantity, created_at, updated_at)
                                                VALUES (:product_id, :supplier_id, :batch_number, :expiry_date, :purchase_price, :quantity, :quantity, NOW(), NOW())
                                                ON DUPLICATE KEY UPDATE 
-                                                   supplier_id = VALUES(supplier_id), -- TAMBAHKAN BARIS INI
+                                                   supplier_id = VALUES(supplier_id),
                                                    expiry_date = VALUES(expiry_date), 
                                                    purchase_price = VALUES(purchase_price), 
                                                    quantity = quantity + VALUES(quantity),
@@ -141,7 +143,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             $stmt_prod_batch->bindParam(':purchase_price', $unit_price); // $unit_price adalah harga beli dari item pembelian saat ini
                             $stmt_prod_batch->bindParam(':quantity', $quantity, PDO::PARAM_INT);
                             $stmt_prod_batch->execute(); 
-                        }
+                        //}
                     }
 
                     $sql_update_total = "UPDATE purchases SET total_amount = :total_amount WHERE purchase_id = :purchase_id";
@@ -311,7 +313,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <div class="flex justify-between items-center mb-4">
                                         <h3 class="text-xl font-semibold">Item Pembelian</h3>
                                     </div> 
-                                    <div id="purchaseItemsSectionWrapper" class="max-h-[500px] border border-gray-300 dark:border-gray-700 rounded-md mb-4">
+                                    <div id="purchaseItemsSectionWrapper" class="max-h-[600px] autoflow-y-auto border border-gray-300 dark:border-gray-700 rounded-md mb-4">
                                         <table class="min-w-full divide-y divide-gray-200 border border-gray-200 dark:border-gray-700 rounded-md mb-4">
                                             <thead class="bg-gray-200 dark:bg-gray-800">
                                                 <tr>
