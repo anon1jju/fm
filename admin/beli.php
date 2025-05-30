@@ -486,6 +486,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
+    
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Script untuk memposisikan hasil pencarian di luar container scroll
@@ -802,5 +804,124 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (paymentStatusSelect) { paymentStatusSelect.addEventListener('change', toggleInitialInstallmentSection); toggleInitialInstallmentSection(); }
     });
     </script>
+    
+    <script>
+const FORM_STORAGE_KEY = "beliFormCache_v1";
+
+// Helper serialize
+function serializePurchaseForm() {
+    const form = document.getElementById('purchaseForm');
+    if (!form) return null;
+    const data = {};
+    // Simpan input biasa
+    form.querySelectorAll('input, select, textarea').forEach(input => {
+        if (input.name && !input.name.endsWith('[]') && input.type !== "file") {
+            data[input.name] = input.value;
+        }
+    });
+    // Simpan item pembelian (array)
+    const keys = [
+        'product_id',
+        'product_search_display',
+        'quantity',
+        'purchase_price',
+        'sell_price',
+        'batch_number',
+        'expiry_date'
+    ];
+    keys.forEach(key => {
+        data[key] = Array.from(form.querySelectorAll(`[name="${key}[]"]`)).map(i => i.value);
+    });
+    return data;
+}
+
+// Helper restore
+function restorePurchaseForm(data) {
+    const form = document.getElementById('purchaseForm');
+    if (!form || !data) return;
+    // Restore input biasa
+    form.querySelectorAll('input, select, textarea').forEach(input => {
+        if (input.name && !input.name.endsWith('[]') && input.type !== "file" && data[input.name] !== undefined) {
+            input.value = data[input.name];
+            if (input.classList.contains('flatpickr-date') && input._flatpickr) {
+                input._flatpickr.setDate(input.value, true);
+            }
+        }
+    });
+
+    // Restore item-row: pastikan jumlah row sesuai cache
+    const n = (data.product_id || []).length;
+    let currentRows = form.querySelectorAll('.item-row').length;
+    let addRowPromises = [];
+    // Tambah row sampai sesuai jumlah data
+    while (currentRows < n) {
+        if (typeof addItemRow === "function") {
+            addItemRow();
+        }
+        currentRows++;
+    }
+
+    // Setelah DOM update, isi data ke tiap row
+    setTimeout(() => {
+        const rows = form.querySelectorAll('.item-row');
+        for (let i = 0; i < n; i++) {
+            if (!rows[i]) continue;
+            rows[i].querySelector('input[name="product_id[]"]').value = data.product_id[i] || "";
+            rows[i].querySelector('input[name="product_search_display[]"]').value = data.product_search_display[i] || "";
+            rows[i].querySelector('input[name="quantity[]"]').value = data.quantity[i] || "";
+            rows[i].querySelector('input[name="purchase_price[]"]').value = data.purchase_price[i] || "";
+            rows[i].querySelector('input[name="sell_price[]"]').value = data.sell_price[i] || "";
+            rows[i].querySelector('input[name="batch_number[]"]').value = data.batch_number[i] || "";
+            // expiry_date
+            const expiryInput = rows[i].querySelector('input[name="expiry_date[]"]');
+            if (expiryInput) {
+                expiryInput.value = data.expiry_date[i] || "";
+                if (expiryInput._flatpickr) expiryInput._flatpickr.setDate(data.expiry_date[i] || "", true);
+            }
+            if (typeof updateItemTotal === "function") updateItemTotal(rows[i]);
+        }
+        // Pastikan grand total terupdate
+        if (typeof updateGrandTotal === "function") updateGrandTotal();
+    }, 100); // delay agar addItemRow benar2 selesai
+}
+
+// Listener autosave
+function setupAutoSavePurchaseForm() {
+    const form = document.getElementById('purchaseForm');
+    if (!form) return;
+    form.addEventListener('input', function() {
+        const data = serializePurchaseForm();
+        if (data) localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(data));
+    });
+    form.querySelectorAll('select').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const data = serializePurchaseForm();
+            if (data) localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(data));
+        });
+    });
+}
+
+// Restore di awal load
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if (empty($_POST)) : ?>
+    const cached = localStorage.getItem(FORM_STORAGE_KEY);
+    if (cached) {
+        try {
+            const data = JSON.parse(cached);
+            // Tunggu addItemRow terdefinisi & DOM ready
+            setTimeout(function() {
+                restorePurchaseForm(data);
+            }, 500);
+        } catch(e) {}
+    }
+    <?php endif; ?>
+    setupAutoSavePurchaseForm();
+});
+
+// Hapus cache saat submit
+document.getElementById('purchaseForm')?.addEventListener('submit', function() {
+    localStorage.removeItem(FORM_STORAGE_KEY);
+});
+</script>
 </body>
 </html>
