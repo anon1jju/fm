@@ -378,7 +378,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         </table>
                                     </div>
                                     <button type="button" id="addItemBtn" class="ti-btn ti-btn-sm ti-btn-success"><i class="ri-add-line me-1"></i>Tambah Item</button>
-                                    <a href="item_masuk.php" class="ti-btn ti-btn-sm ti-btn-primary">Input Barang Baru</a>
+                                    <a href="item_masuk.php" class="ti-btn ti-btn-sm ti-btn-info">Input Barang Baru</a>
                                     <div class="grand-total-container">
                                         <label class="form-label text-lg font-bold">Total Pembelian:</label>
                                         <span id="grandTotalDisplay">Rp 0</span>
@@ -428,12 +428,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4"> <!-- Ini baris utama form dua kolom -->
                                             
                                                     <div>
-                                                        <label for="initial_payment_date" class="form-label">Tanggal Bayar Awal</label>
+                                                        <label for="initial_payment_date" class="form-label">Tanggal Bayar Cicil</label>
                                                         <input type="text" class="ti-form-input flatpickr-date" id="initial_payment_date" name="initial_payment_date" value="<?php echo isset($_POST['initial_payment_date']) ? htmlspecialchars($_POST['initial_payment_date']) : date('Y-m-d'); ?>">
                                                     </div>
                                             
                                                     <div>
-                                                        <label for="initial_amount_paid" class="form-label">Jumlah Bayar Awal</label>
+                                                        <label for="initial_amount_paid" class="form-label">Jumlah Bayar Cicil</label>
                                                         <input type="tel" step="any" class="ti-form-input" id="initial_amount_paid" name="initial_amount_paid" min="0" value="<?php echo isset($_POST['initial_amount_paid']) ? htmlspecialchars($_POST['initial_amount_paid']) : ''; ?>" placeholder="0">
                                                         <p class="text-xs text-gray-500 mt-1">Jumlah hrga yang akan dicicil</p>
                                                     </div>
@@ -485,60 +485,60 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="../assets/js/custom-switcher.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    
-    
-    
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Script untuk memposisikan hasil pencarian di luar container scroll
-            const searchInputs = document.querySelectorAll('.product-search-input');
-            
-            searchInputs.forEach(input => {
-                const resultsDiv = input.parentElement.querySelector('.product-search-results');
-                
-                input.addEventListener('focus', function() {
-                    if (resultsDiv) {
-                        // Menghitung posisi hasil pencarian
-                        const inputRect = input.getBoundingClientRect();
-                        // const wrapperRect = document.getElementById('purchaseItemsSectionWrapper').getBoundingClientRect(); // Tidak terpakai
-                        
-                        // Memposisikan hasil pencarian di luar wrapper
-                        resultsDiv.style.position = 'fixed';
-                        resultsDiv.style.top = (inputRect.bottom) + 'px';
-                        resultsDiv.style.left = inputRect.left + 'px';
-                        resultsDiv.style.width = inputRect.width + 'px';
-                        resultsDiv.style.display = 'block';
-                    }
-                });
-                
-                // Menyembunyikan hasil pencarian saat klik di luar
-                document.addEventListener('click', function(e) {
-                    if (e.target !== input && !resultsDiv.contains(e.target)) {
-                        resultsDiv.style.display = 'none';
-                    }
-                });
+    document.addEventListener("DOMContentLoaded", function () {
+        // Script untuk memposisikan hasil pencarian di luar container scroll
+        const searchInputs = document.querySelectorAll(".product-search-input");
+
+        searchInputs.forEach((input) => {
+            const resultsDiv = input.parentElement.querySelector(".product-search-results");
+
+            input.addEventListener("focus", function () {
+                if (resultsDiv) {
+                    // Menghitung posisi hasil pencarian
+                    const inputRect = input.getBoundingClientRect();
+                    // const wrapperRect = document.getElementById('purchaseItemsSectionWrapper').getBoundingClientRect(); // Tidak terpakai
+
+                    // Memposisikan hasil pencarian di luar wrapper
+                    resultsDiv.style.position = "fixed";
+                    resultsDiv.style.top = inputRect.bottom + "px";
+                    resultsDiv.style.left = inputRect.left + "px";
+                    resultsDiv.style.width = inputRect.width + "px";
+                    resultsDiv.style.display = "block";
+                }
+            });
+
+            // Menyembunyikan hasil pencarian saat klik di luar
+            document.addEventListener("click", function (e) {
+                if (e.target !== input && !resultsDiv.contains(e.target)) {
+                    resultsDiv.style.display = "none";
+                }
             });
         });
-    </script>
-    
-    <script>
-        function generateInvoiceNumber() {
-            const randomNumber = Math.floor(10000 + Math.random() * 90000);
-            document.getElementById('invoice_number_supplier').value = randomNumber;
-        }
-    </script>
-    
-    <script>
-    $(document).ready(function() { $('.select2').select2({ placeholder: "Pilih Supplier", allowClear: true }); });
-    </script>
-    
-    <script>
+    });
+</script>
+
+<script>
+    function generateInvoiceNumber() {
+        const randomNumber = Math.floor(10000 + Math.random() * 90000);
+        document.getElementById("invoice_number_supplier").value = randomNumber;
+    }
+</script>
+
+<script>
+    $(document).ready(function () {
+        $(".select2").select2({ placeholder: "Pilih Supplier", allowClear: true });
+    });
+</script>
+
+<script>
     const productsList = <?php echo json_encode($products_list_for_js); ?>;
     document.addEventListener('DOMContentLoaded', function () {
         const itemsContainer = document.getElementById('itemsContainer');
         const addItemBtn = document.getElementById('addItemBtn');
         const grandTotalDisplay = document.getElementById('grandTotalDisplay');
-        
+
         // BARU: Global click listener untuk menyembunyikan hasil pencarian produk
         document.addEventListener('click', function(e) {
             document.querySelectorAll('.product-search-results').forEach(resultsDiv => {
@@ -555,7 +555,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             });
         });
 
-        function getDefaultItemRowHTML() { /* ... JavaScript for item row template ... */ 
+        function getDefaultItemRowHTML() { /* ... JavaScript for item row template ... */
             return `
                 <td class="px-4 py-2 whitespace-nowrap product-search-input-container">
                     <input type="text" class="ti-form-input product-search-input" name="product_search_display[]" placeholder="Cari Produk/Kode/Barcode..." style="width: 100%;" autocomplete="off">
@@ -575,7 +575,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         document.querySelectorAll('.flatpickr-date:not(.expiry-date-input)').forEach(el => { flatpickr(el, { dateFormat: "Y-m-d", altInput: true, altFormat: "d-m-Y", allowInput: true }); });
         function initializeExpiryDateFlatpickr(element) { if (!element) return; if (element._flatpickr) { element._flatpickr.destroy(); } flatpickr(element, { dateFormat: "Y-m-d", altInput: true, altFormat: "d-m-Y", allowInput: true, placeholder: "YYYY-MM-DD" });}
-        
+
         itemsContainer.querySelectorAll('.item-row').forEach(row => {
             const expiryInput = row.querySelector('.expiry-date-input');
             if (expiryInput) { initializeExpiryDateFlatpickr(expiryInput); }
@@ -583,13 +583,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             attachCalculationListeners(row);
             const removeBtn = row.querySelector('.removeItemBtn');
             if (removeBtn) { attachRemoveButtonListener(removeBtn); }
-            updateItemTotal(row); 
+            updateItemTotal(row);
         });
 
-        if (itemsContainer.querySelectorAll('.item-row').length === 0 && <?php echo isset($_POST['product_id']) ? 'false' : 'true'; ?>) { addItemRow(); } 
+        if (itemsContainer.querySelectorAll('.item-row').length === 0 && <?php echo isset($_POST['product_id']) ? 'false' : 'true'; ?>) { addItemRow(); }
         else if (itemsContainer.querySelectorAll('.item-row').length > 0) { updateGrandTotal(); }
 
-        function updateGrandTotal() { /* ... JavaScript ... */ 
+        function updateGrandTotal() {
             let grandTotal = 0;
             itemsContainer.querySelectorAll('.item-row').forEach(row => {
                 const quantity = parseFloat(row.querySelector('.quantity-input').value) || 0;
@@ -598,18 +598,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             });
             grandTotalDisplay.textContent = 'Rp ' + grandTotal.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
         }
-        function updateItemTotal(rowElement) { /* ... JavaScript ... */ 
+        function updateItemTotal(rowElement) {
             const quantity = parseFloat(rowElement.querySelector('.quantity-input').value) || 0;
             const purchasePrice = parseFloat(rowElement.querySelector('.purchase-price-input').value) || 0;
             const itemTotal = quantity * purchasePrice;
             rowElement.querySelector('.item-total-display').value = 'Rp ' + itemTotal.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             updateGrandTotal();
         }
-        function attachCalculationListeners(rowElement) { /* ... JavaScript ... */ 
+        function attachCalculationListeners(rowElement) {
             rowElement.querySelector('.quantity-input').addEventListener('input', () => updateItemTotal(rowElement));
             rowElement.querySelector('.purchase-price-input').addEventListener('input', () => updateItemTotal(rowElement));
         }
-        function clearProductSearch(rowElement) { /* ... JavaScript ... */ 
+        function clearProductSearch(rowElement) {
             rowElement.querySelector('.product-search-input').value = '';
             rowElement.querySelector('.actual-product-id').value = '';
             const resultsContainer = rowElement.querySelector('.product-search-results');
@@ -672,7 +672,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     currentFilteredProducts.forEach(product => {
                         const div = document.createElement('div');
                         div.innerHTML = `<span class="result-name">${product.product_name}</span> <span class="result-details">(Kode: ${product.product_code || 'N/A'}, BC: ${product.barcode || 'N/A'}, Stok: ${product.stock_quantity || 0})</span>`;
-                        
+
                         div.addEventListener('click', function() {
                             searchInput.value = product.product_name;
                             hiddenIdInput.value = product.product_id;
@@ -682,7 +682,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             rowElement.querySelector('input[name="purchase_price[]"]').value = product.cost_price !== undefined ? product.cost_price : '';
                             rowElement.querySelector('input[name="sell_price[]"]').value = product.price !== undefined ? product.price : '';
                             rowElement.querySelector('input[name="batch_number[]"]').value = product.default_batch_number || '';
-                            
+
                             const expiryDateInputEl = rowElement.querySelector('input[name="expiry_date[]"]');
                             if (expiryDateInputEl) {
                                 if (product.default_expiry_date && expiryDateInputEl._flatpickr) {
@@ -705,7 +705,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             searchInput.addEventListener('keydown', function(event) {
                 if (event.key === 'Enter') {
                     if (resultsContainer.style.display === 'block' && currentFilteredProducts.length === 1) {
-                        event.preventDefault(); 
+                        event.preventDefault();
                         const firstResultDiv = resultsContainer.querySelector('div');
                         if (firstResultDiv && typeof firstResultDiv.click === 'function') {
                             firstResultDiv.click();
@@ -715,7 +715,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                 }
             });
-        
+
             // Sembunyikan dropdown jika klik di luar area pencarian
             document.addEventListener("click", function (event) {
                 if (searchInput && resultsContainer && !searchInput.contains(event.target) && !resultsContainer.contains(event.target)) {
@@ -725,7 +725,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
 
-        function attachRemoveButtonListener(button) { /* ... JavaScript ... */ 
+        function attachRemoveButtonListener(button) {
             button.addEventListener('click', function () {
                 const itemRows = itemsContainer.querySelectorAll('.item-row');
                 if (itemRows.length > 1) {
@@ -736,8 +736,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 } else { Swal.fire("Info", "Minimal harus ada 1 item pembelian.", "warning"); }
             });
         }
-        function addItemRow() { /* ... JavaScript ... */ 
-            const newItemRow = document.createElement('tr'); newItemRow.classList.add('item-row'); newItemRow.innerHTML = itemRowTemplateHTML; 
+        function addItemRow() {
+            const newItemRow = document.createElement('tr'); newItemRow.classList.add('item-row'); newItemRow.innerHTML = itemRowTemplateHTML;
             itemsContainer.appendChild(newItemRow);
             initializeProductSearch(newItemRow);
             const newExpiryInput = newItemRow.querySelector('.expiry-date-input');
@@ -753,7 +753,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         addItemBtn.addEventListener('click', addItemRow);
 
         const purchaseForm = document.getElementById('purchaseForm');
-        if(purchaseForm){ purchaseForm.addEventListener('submit', function(event){ /* ... JavaScript form validation ... */ 
+        if(purchaseForm){ purchaseForm.addEventListener('submit', function(event){ /* ... JavaScript form validation ... */
             const itemRowsNodeList = itemsContainer.querySelectorAll('.item-row'); let hasFilledItem = false;
             if (itemRowsNodeList.length === 0) { Swal.fire('Input Tidak Lengkap', 'Harap tambahkan minimal satu item pembelian.', 'warning'); event.preventDefault(); return; }
             for (let i = 0; i < itemRowsNodeList.length; i++) { if (itemRowsNodeList[i].querySelector('.actual-product-id').value) { hasFilledItem = true; break; }}
@@ -761,7 +761,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             let formIsValid = true;
             itemRowsNodeList.forEach((row, index) => {
                 const actualProductIdInput = row.querySelector('.actual-product-id'); const productSearchDisplay = row.querySelector('.product-search-input');
-                if (actualProductIdInput.value) { 
+                if (actualProductIdInput.value) {
                     const quantityInput = row.querySelector('.quantity-input'); const purchasePriceInput = row.querySelector('.purchase-price-input'); const sellPriceInput = row.querySelector('.sell-price-input'); let rowErrorMessages = [];
                     if (!quantityInput.value || parseFloat(quantityInput.value) <= 0) { rowErrorMessages.push("Kuantitas (>0)"); }
                     if (purchasePriceInput.value === '' || parseFloat(purchasePriceInput.value) < 0) { rowErrorMessages.push("Harga Beli (>=0)"); }
@@ -779,7 +779,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         });}
 
         const purchaseDateInput = document.getElementById('purchase_date'); const dueDaysInput = document.getElementById('due_days'); const dueDateInput = document.getElementById('due_date');
-        function calculateDueDate() { /* ... JavaScript for due date calculation ... */ 
+        function calculateDueDate() {
             if (purchaseDateInput && purchaseDateInput._flatpickr && purchaseDateInput._flatpickr.selectedDates.length > 0 && dueDaysInput.value !== '') {
                 const pDate = new Date(purchaseDateInput._flatpickr.selectedDates[0]); const days = parseInt(dueDaysInput.value, 10);
                 if (!isNaN(days) && days >= 0) { pDate.setDate(pDate.getDate() + days); if (dueDateInput && dueDateInput._flatpickr) { dueDateInput._flatpickr.setDate(pDate, true); } else if (dueDateInput) { const year = pDate.getFullYear(); const month = ('0' + (pDate.getMonth() + 1)).slice(-2); const day = ('0' + pDate.getDate()).slice(-2); dueDateInput.value = `${year}-${month}-${day}`;}}
@@ -787,7 +787,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         if (purchaseDateInput && purchaseDateInput._flatpickr) { purchaseDateInput._flatpickr.config.onClose.push(calculateDueDate); } else if (purchaseDateInput) { purchaseDateInput.addEventListener('change', calculateDueDate); }
         if (dueDaysInput) { dueDaysInput.addEventListener('input', calculateDueDate); }
-        
+
         const paymentStatusSelect = document.getElementById('payment_status');
         const initialInstallmentSection = document.getElementById('initial-installment-section');
         const cicilInfoPlaceholder = document.getElementById('cicil-info-placeholder');
@@ -803,7 +803,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         if (paymentStatusSelect) { paymentStatusSelect.addEventListener('change', toggleInitialInstallmentSection); toggleInitialInstallmentSection(); }
     });
-    </script>
+</script>
+
     
 </body>
 </html>
