@@ -232,25 +232,52 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .item-row:not(:first-child) { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc; }
         .item-total-price { font-weight: bold; text-align: right; }
         #purchaseItemsSectionWrapper {
-            max-height: 500px; /* atau 400px sesuai definisi Anda */
-            /* overflow-y: auto; Dihapus atau diubah menjadi visible */
-            overflow-y: visible; /* Coba ini */
+            max-height: 400px;
+            overflow-y: auto;
             padding-right: 10px;
             margin-bottom: 1rem;
+            
         }
+
+        #purchaseItemsSectionWrapper thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #a1a2a6;
+        }
+                /* Targetkan header kolom pertama (Produk) di tabel item pembelian */
+        #purchaseItemsSectionWrapper table thead th:first-child {
+            width: 250px; /* Naikkan nilai ini, misalnya dari 300px menjadi 350px atau lebih */
+            /* Anda juga bisa menggunakan persentase, contoh: width: 35%; */
+        }
+        
+        /* Targetkan sel data kolom pertama (Produk) di tabel item pembelian */
+        #purchaseItemsSectionWrapper table tbody td:first-child {
+            width: 250px; /* Pastikan lebar ini sama dengan yang di th agar kolomnya lurus */
+        }
+        
+        /* Opsional: Memastikan input di dalamnya benar-benar menggunakan lebar tersebut */
+        #purchaseItemsSectionWrapper table tbody td:first-child .product-search-input {
+            min-width: 100%;
+            box-sizing: border-box;
+        }
+        
+        
         .grand-total-container { margin-top: 1rem; padding-top: 1rem; border-top: 2px solid #333; text-align: right; }
         .grand-total-container span { font-size: 1.25rem; font-weight: bold; }
         .product-search-input-container { position: relative; }
         .product-search-results {
             position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            max-height: 250px;
+            overflow-y: auto;
             background-color: white;
-            border: 1px solid #ddd;
-            border-top: none;
-            z-index: 1001;
-            width: 200%; /* Atau sesuaikan dengan kebutuhan */
-            max-height: 300px;
-            overflow-y: auto; /* Diubah dari visible ke auto */
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+            border-radius: 0.575rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 1001; /* Z-index tinggi agar muncul di atas semua elemen */
         }
         .product-search-results div { padding: 8px 12px; cursor: pointer; }
         .product-search-results div:hover { background-color: #f0f0f0; }
@@ -313,18 +340,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <div class="flex justify-between items-center mb-4">
                                         <h3 class="text-xl font-semibold">Item Pembelian</h3>
                                     </div> 
-                                    <div id="purchaseItemsSectionWrapper" class="max-h-[600px] autoflow-y-auto border border-gray-300 dark:border-gray-700 rounded-md mb-4">
+                                    <div id="purchaseItemsSectionWrapper" class="border border-gray-300 dark:border-gray-700 rounded-md mb-4">
                                         <table class="min-w-full divide-y divide-gray-200 border border-gray-200 dark:border-gray-700 rounded-md mb-4">
                                             <thead class="bg-gray-200 dark:bg-gray-800">
                                                 <tr>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Produk <span class="text-red-500">*</span></th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Qty <span class="text-red-500">*</span></th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Harga Beli <span class="text-red-500">*</span></th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Harga Jual <span class="text-red-500">*</span></th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total Item</th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Batch</th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Expire</th>
-                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider">Aksi</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Produk <span class="text-red-500">*</span></th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Qty <span class="text-red-500">*</span></th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Harga Beli <span class="text-red-500">*</span></th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Harga Jual <span class="text-red-500">*</span></th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Total Item</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Batch</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Expire</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-100 dark:text-gray-300 uppercase tracking-wider">Aksi</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="itemsContainer" class="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-700">
@@ -333,7 +360,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 for ($i = 0; $i < $item_count; $i++):
                                                 ?>
                                                 <tr class="item-row">
-                                                    <td class="px-4 py-2 whitespace-nowrap product-search-input-container">
+                                                    <td class="px-3 py-2 whitespace-nowrap product-search-input-container">
                                                         <input type="text" class="ti-form-input product-search-input" name="product_search_display[]" placeholder="Cari Produk/Kode/Barcode..." style="width: 100%;" autocomplete="off" value="<?php echo isset($_POST['product_search_display'][$i]) ? htmlspecialchars($_POST['product_search_display'][$i]) : ''; ?>">
                                                         <input type="hidden" name="product_id[]" class="actual-product-id" value="<?php echo isset($_POST['product_id'][$i]) ? htmlspecialchars($_POST['product_id'][$i]) : ''; ?>">
                                                         <div class="product-search-results"></div>
@@ -351,6 +378,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         </table>
                                     </div>
                                     <button type="button" id="addItemBtn" class="ti-btn ti-btn-sm ti-btn-success"><i class="ri-add-line me-1"></i>Tambah Item</button>
+                                    <a href="item_masuk.php" class="ti-btn ti-btn-sm ti-btn-primary">Input Barang Baru</a>
                                     <div class="grand-total-container">
                                         <label class="form-label text-lg font-bold">Total Pembelian:</label>
                                         <span id="grandTotalDisplay">Rp 0</span>
@@ -459,6 +487,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Script untuk memposisikan hasil pencarian di luar container scroll
+            const searchInputs = document.querySelectorAll('.product-search-input');
+            
+            searchInputs.forEach(input => {
+                const resultsDiv = input.parentElement.querySelector('.product-search-results');
+                
+                input.addEventListener('focus', function() {
+                    if (resultsDiv) {
+                        // Menghitung posisi hasil pencarian
+                        const inputRect = input.getBoundingClientRect();
+                        // const wrapperRect = document.getElementById('purchaseItemsSectionWrapper').getBoundingClientRect(); // Tidak terpakai
+                        
+                        // Memposisikan hasil pencarian di luar wrapper
+                        resultsDiv.style.position = 'fixed';
+                        resultsDiv.style.top = (inputRect.bottom) + 'px';
+                        resultsDiv.style.left = inputRect.left + 'px';
+                        resultsDiv.style.width = inputRect.width + 'px';
+                        resultsDiv.style.display = 'block';
+                    }
+                });
+                
+                // Menyembunyikan hasil pencarian saat klik di luar
+                document.addEventListener('click', function(e) {
+                    if (e.target !== input && !resultsDiv.contains(e.target)) {
+                        resultsDiv.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+    
+    <script>
         function generateInvoiceNumber() {
             const randomNumber = Math.floor(10000 + Math.random() * 90000);
             document.getElementById('invoice_number_supplier').value = randomNumber;
@@ -475,6 +536,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const itemsContainer = document.getElementById('itemsContainer');
         const addItemBtn = document.getElementById('addItemBtn');
         const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+        
+        // BARU: Global click listener untuk menyembunyikan hasil pencarian produk
+        document.addEventListener('click', function(e) {
+            document.querySelectorAll('.product-search-results').forEach(resultsDiv => {
+                if (resultsDiv.style.display !== 'none') { // Hanya proses jika sedang ditampilkan
+                    const searchInputContainer = resultsDiv.closest('.product-search-input-container');
+                    if (searchInputContainer) {
+                        const searchInput = searchInputContainer.querySelector('.product-search-input');
+                        // Sembunyikan jika klik bukan pada input terkait dan bukan di dalam resultsDiv itu sendiri
+                        if (searchInput && e.target !== searchInput && !resultsDiv.contains(e.target)) {
+                            resultsDiv.style.display = 'none';
+                        }
+                    }
+                }
+            });
+        });
 
         function getDefaultItemRowHTML() { /* ... JavaScript for item row template ... */ 
             return `
@@ -544,100 +621,107 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             updateItemTotal(rowElement);
         }
         function initializeProductSearch(rowElement) {
-    const searchInput = rowElement.querySelector('.product-search-input');
-    const resultsContainer = rowElement.querySelector('.product-search-results');
-    const hiddenIdInput = rowElement.querySelector('.actual-product-id');
-    let currentFilteredProducts = []; // Variabel untuk menyimpan hasil filter terakhir
+            const searchInput = rowElement.querySelector('.product-search-input');
+            const resultsContainer = rowElement.querySelector('.product-search-results');
+            const hiddenIdInput = rowElement.querySelector('.actual-product-id');
+            let currentFilteredProducts = [];
 
-    searchInput.addEventListener('input', function() {
-        const term = this.value.toLowerCase();
-        resultsContainer.innerHTML = '';
-        currentFilteredProducts = []; // Reset hasil filter
+            searchInput.addEventListener('focus', function() {
+                const inputRect = searchInput.getBoundingClientRect();
+                resultsContainer.style.position = 'fixed';
+                resultsContainer.style.top = (inputRect.bottom) + 'px';
+                resultsContainer.style.left = inputRect.left + 'px';
+                resultsContainer.style.width = inputRect.width + 'px';
+                // z-index sudah diatur di CSS, pastikan cukup tinggi (misal: 1050 atau lebih)
 
-        if (term.length < 1) {
-            resultsContainer.style.display = 'none';
-            return;
-        }
-
-        // Filter produk berdasarkan nama, barcode, atau kode produk
-        currentFilteredProducts = productsList.filter(p =>
-            p.product_name.toLowerCase().includes(term) ||
-            (p.barcode && String(p.barcode).toLowerCase().includes(term)) || // Pastikan barcode adalah string
-            (p.product_code && String(p.product_code).toLowerCase().includes(term)) // Pastikan product_code adalah string
-        );
-
-        if (currentFilteredProducts.length > 0) {
-            currentFilteredProducts.forEach(product => {
-                const div = document.createElement('div');
-                // Sesuaikan detail yang ditampilkan jika perlu
-                div.innerHTML = `<span class="result-name">${product.product_name}</span> <span class="result-details">(Kode: ${product.product_code || 'N/A'}, BC: ${product.barcode || 'N/A'}, Stok: ${product.stock_quantity || 0})</span>`;
-                
-                div.addEventListener('click', function() {
-                    searchInput.value = product.product_name;
-                    hiddenIdInput.value = product.product_id;
-                    resultsContainer.innerHTML = '';
-                    resultsContainer.style.display = 'none';
-
-                    rowElement.querySelector('input[name="purchase_price[]"]').value = product.cost_price !== undefined ? product.cost_price : '';
-                    rowElement.querySelector('input[name="sell_price[]"]').value = product.price !== undefined ? product.price : '';
-                    rowElement.querySelector('input[name="batch_number[]"]').value = product.default_batch_number || '';
-                    
-                    const expiryDateInputEl = rowElement.querySelector('input[name="expiry_date[]"]');
-                    if (expiryDateInputEl) {
-                        if (product.default_expiry_date && expiryDateInputEl._flatpickr) {
-                            expiryDateInputEl._flatpickr.setDate(product.default_expiry_date, true);
-                        } else if (expiryDateInputEl) { // Fallback jika flatpickr belum init
-                            expiryDateInputEl.value = product.default_expiry_date || '';
-                        }
+                // Jika input sudah ada teksnya dan ada hasil filter, tampilkan
+                // Namun, logika utama penampilan ada di event 'input'
+                if (searchInput.value.trim().length > 0) {
+                    if (currentFilteredProducts.length > 0 || resultsContainer.innerHTML.includes('Produk tidak ditemukan')) {
+                        resultsContainer.style.display = 'block';
                     }
-                    updateItemTotal(rowElement);
-                    
-                    // Opsional: Pindahkan fokus ke input kuantitas setelah produk dipilih
-                    // const quantityInput = rowElement.querySelector('.quantity-input');
-                    // if (quantityInput) {
-                    //     quantityInput.focus();
-                    //     quantityInput.select(); // Pilih semua teks di input kuantitas
-                    // }
-                });
-                resultsContainer.appendChild(div);
-            });
-            resultsContainer.style.display = 'block';
-        } else {
-            resultsContainer.innerHTML = '<div>Produk tidak ditemukan</div>';
-            resultsContainer.style.display = 'block';
-        }
-    });
-
-    // Tambahan untuk menangani tombol "Enter" (umumnya dari barcode scanner)
-    searchInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            // Jika dropdown hasil terlihat dan hanya ada satu produk yang cocok
-            if (resultsContainer.style.display === 'block' && currentFilteredProducts.length === 1) {
-                event.preventDefault(); // Mencegah aksi default "Enter" (misalnya submit form)
-                
-                // Ambil div hasil pertama dan simulasikan klik
-                const firstResultDiv = resultsContainer.querySelector('div');
-                if (firstResultDiv && typeof firstResultDiv.click === 'function') {
-                    firstResultDiv.click();
                 }
-            } else if (resultsContainer.style.display === 'block' && currentFilteredProducts.length > 1) {
-                // Jika ada banyak hasil, cegah submit form tapi biarkan dropdown terbuka
-                // agar pengguna bisa memilih atau memperbaiki pencarian.
-                event.preventDefault();
-            }
-            // Jika tidak ada hasil atau dropdown tidak terlihat, biarkan "Enter" berperilaku normal.
-        }
-    });
+            });
 
-    // Sembunyikan dropdown jika klik di luar area pencarian
-    document.addEventListener('click', function(event) {
-        if (searchInput && resultsContainer && 
-            !searchInput.contains(event.target) && 
-            !resultsContainer.contains(event.target)) {
-            resultsContainer.style.display = 'none';
+            searchInput.addEventListener('input', function() {
+                const term = this.value.toLowerCase();
+                resultsContainer.innerHTML = '';
+                currentFilteredProducts = [];
+
+                if (term.length < 1) {
+                    resultsContainer.style.display = 'none';
+                    return;
+                }
+
+                // Pastikan posisi fixed tetap terjaga saat input berubah (jika diperlukan)
+                const inputRect = searchInput.getBoundingClientRect();
+                resultsContainer.style.position = 'fixed';
+                resultsContainer.style.top = (inputRect.bottom) + 'px';
+                resultsContainer.style.left = inputRect.left + 'px';
+                resultsContainer.style.width = inputRect.width + 'px';
+
+                currentFilteredProducts = productsList.filter(p =>
+                    p.product_name.toLowerCase().includes(term) ||
+                    (p.barcode && String(p.barcode).toLowerCase().includes(term)) ||
+                    (p.product_code && String(p.product_code).toLowerCase().includes(term))
+                );
+
+                if (currentFilteredProducts.length > 0) {
+                    currentFilteredProducts.forEach(product => {
+                        const div = document.createElement('div');
+                        div.innerHTML = `<span class="result-name">${product.product_name}</span> <span class="result-details">(Kode: ${product.product_code || 'N/A'}, BC: ${product.barcode || 'N/A'}, Stok: ${product.stock_quantity || 0})</span>`;
+                        
+                        div.addEventListener('click', function() {
+                            searchInput.value = product.product_name;
+                            hiddenIdInput.value = product.product_id;
+                            resultsContainer.innerHTML = '';
+                            resultsContainer.style.display = 'none'; // Sembunyikan setelah dipilih
+
+                            rowElement.querySelector('input[name="purchase_price[]"]').value = product.cost_price !== undefined ? product.cost_price : '';
+                            rowElement.querySelector('input[name="sell_price[]"]').value = product.price !== undefined ? product.price : '';
+                            rowElement.querySelector('input[name="batch_number[]"]').value = product.default_batch_number || '';
+                            
+                            const expiryDateInputEl = rowElement.querySelector('input[name="expiry_date[]"]');
+                            if (expiryDateInputEl) {
+                                if (product.default_expiry_date && expiryDateInputEl._flatpickr) {
+                                    expiryDateInputEl._flatpickr.setDate(product.default_expiry_date, true);
+                                } else if (expiryDateInputEl) {
+                                    expiryDateInputEl.value = product.default_expiry_date || '';
+                                }
+                            }
+                            updateItemTotal(rowElement);
+                        });
+                        resultsContainer.appendChild(div);
+                    });
+                    resultsContainer.style.display = 'block';
+                } else {
+                    resultsContainer.innerHTML = '<div>Produk tidak ditemukan</div>';
+                    resultsContainer.style.display = 'block';
+                }
+            });
+
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    if (resultsContainer.style.display === 'block' && currentFilteredProducts.length === 1) {
+                        event.preventDefault(); 
+                        const firstResultDiv = resultsContainer.querySelector('div');
+                        if (firstResultDiv && typeof firstResultDiv.click === 'function') {
+                            firstResultDiv.click();
+                        }
+                    } else if (resultsContainer.style.display === 'block' && currentFilteredProducts.length > 1) {
+                        event.preventDefault();
+                    }
+                }
+            });
+        
+            // Sembunyikan dropdown jika klik di luar area pencarian
+            document.addEventListener("click", function (event) {
+                if (searchInput && resultsContainer && !searchInput.contains(event.target) && !resultsContainer.contains(event.target)) {
+                    resultsContainer.style.display = "none";
+                }
+            });
         }
-    });
-}
+
 
         function attachRemoveButtonListener(button) { /* ... JavaScript ... */ 
             button.addEventListener('click', function () {
