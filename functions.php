@@ -105,6 +105,28 @@ class Farmamedika
             return [];
         }
     }
+    
+    public function getProductsByPosisiLike($posisiKeyword)
+    {
+        if (!$this->pdo) {
+            error_log("getProductsByPosisiLike Error: No valid PDO connection.");
+            return [];
+        }
+        try {
+            $query = "SELECT product_id, kode_item, product_name, posisi, unit, stock_quantity 
+                      FROM products 
+                      WHERE posisi LIKE :posisi_keyword AND is_active = 1
+                      ORDER BY product_name ASC";
+            $stmt = $this->pdo->prepare($query);
+            $keyword = "%" . trim($posisiKeyword) . "%";
+            $stmt->bindParam(':posisi_keyword', $keyword, PDO::PARAM_STR);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Database Error (getProductsByPosisiLike): " . $e->getMessage());
+            return [];
+        }
+    }
 
     /**
      * Mengupdate jumlah yang sudah dibayar dan status pembayaran untuk faktur tertentu.
