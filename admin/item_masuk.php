@@ -198,8 +198,16 @@ if ($pdo) {
                                                 <i class="ri-error-warning-line ltr:mr-2 rtl:ml-2"></i><?php echo $errorMessage; ?>
                                             </div>
                                         <?php endif; ?>
-                                        <form action="../prosesdata/process_tambah_barang2.php" method="POST" id="tambahBarangForm">
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Input beberapa produk sekaligus, satu baris untuk satu produk.</p>
+                                        <form action="../prosesdata/process_tambah_barang.php" method="POST" id="tambahBarangForm">
+                                            <div class="flex items-center justify-between mb-4">
+                                                  <p class="text-sm text-gray-600 dark:text-gray-400">
+                                                    Input beberapa produk sekaligus, satu baris untuk satu produk.
+                                                  </p>
+                                                  <a href="beli.php" class="ti-btn ti-btn-info">
+                                                    Pembelian Supplier
+                                                  </a>
+                                                </div>
+
                                         
                                             <table class="min-w-full border text-sm text-left" id="produkTable">
                                                 <thead>
@@ -213,6 +221,7 @@ if ($pdo) {
                                                         <th class="border px-2 py-1">Harga Modal</th>
                                                         <th class="border px-2 py-1">Harga Jual</th>
                                                         <th class="border px-2 py-1">Batch</th>
+                                                        <th class="border px-2 py-1">Rak</th>
                                                         <th class="border px-2 py-1">Expire</th>
                                                         <!--<th class="border px-2 py-1">Catatan</th>-->
                                                         <th class="border px-2 py-1">Aksi</th>
@@ -229,7 +238,7 @@ if ($pdo) {
                                                         </td>
                                                         <td><input type="text" name="barcode[]" class="ti-form-input w-full" /><div id="barcode_error" class="error-message"></div></td>
                                                         
-                                                        <td><input type="text" name="nama_produk[]" class="ti-form-input w-full" required /></td>
+                                                        <td><input type="text" name="nama_produk[]" class="ti-form-input" style="width: 150px; font-size: 12px;" required /></td>
                                                         <td>
                                                             <select name="category_id[]" class="ti-form-select w-full">
                                                                 <option value="">Pilih</option>
@@ -246,10 +255,11 @@ if ($pdo) {
                                                                 <?php endforeach; ?>
                                                             </select>
                                                         </td>
-                                                        <td><input type="number" step="any" min="0" name="minimum_stock[]" class="ti-form-input w-full" required /></td>
-                                                        <td><input type="number" step="any" min="0" name="cost_price[]" class="ti-form-input w-full" required /></td>
-                                                        <td><input type="number" step="any" min="0" name="price[]" class="ti-form-input w-full" required /></td>
-                                                        <td><input type="text" name="batch_number[]" class="ti-form-input w-full" /></td>
+                                                        <td><input type="number" step="any" min="0" name="minimum_stock[]" class="ti-form-input" style="width: 64px; font-size: 12px;" required /></td>
+                                                        <td><input type="text" inputmode="numeric" step="any" min="0" name="cost_price[]" class="ti-form-input w-full" required /></td>
+                                                        <td><input type="text" inputmode="numeric" step="any" min="0" name="price[]" class="ti-form-input w-full" required /></td>
+                                                        <td><input type="text" name="batch_number[]" class="ti-form-input" style="width: 75px; font-size: 12px;" /></td>
+                                                        <td><input type="text" name="posisi[]" class="ti-form-input" style="width: 50px; font-size: 12px;" /></td>
                                                         <td><input type="tel" name="expire_date[]" class="ti-form-input w-full" placeholder="DD-MM-YYYY" required /></td>
                                                         <!--<td><textarea name="reason[]" rows="1" class="ti-form-input w-full">Penambahan produk baru</textarea></td>-->
                                                         <td><button type="button" class="ti-btn ti-btn-danger" onclick="hapusBaris(this)"><i class="ri-delete-bin-line"></i></button></td>
