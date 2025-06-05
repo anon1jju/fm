@@ -2,8 +2,8 @@
 require_once '../functions.php';
 
 // Cek apakah user memiliki role admin
-if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
-    header("Location: ../signin.php");
+if (!$farma->checkPersistentSession() || !isset($_SESSION["role"]) || $_SESSION["role"] !== "admin") {
+    header("Location: ../signin.php"); 
     exit();
 }
 
@@ -21,6 +21,7 @@ $transactions = $farma->getSalesTransactions($startDate, $endDate);
 <head>
     <?php include "includes/meta.php";?>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../assets/libs/flatpickr/flatpickr.min.css">
 </head>
 
 <body>
@@ -48,12 +49,12 @@ $transactions = $farma->getSalesTransactions($startDate, $endDate);
                         <div class="box">
                             <div class="box-header justify-between">
                                 <div class="box-title">
-                                    <i class="ri-file-list-3-line text-2xl"></i></i> Penjualan 
+                                    <i class="ri-file-list-3-line text-2xl mb-3"></i></i> Penjualan 
                                     <div class="flex gap-1 items-center">
                                         <span class="text-sm">Dari:</span>
-                                        <input id="start-date" class="ti-form-control" type="date" value="<?php echo $startDate; ?>" onchange="filterByDate()">
+                                        <input id="start-date" class="ti-form-control flatpickr-date" type="text" value="<?php echo $startDate; ?>" onchange="filterByDate()">
                                         <span class="text-sm">Ke:</span>
-                                        <input id="end-date" class="ti-form-control" type="date" value="<?php echo $endDate; ?>" onchange="filterByDate()">
+                                        <input id="end-date" class="ti-form-control flatpickr-date" type="text" value="<?php echo $endDate; ?>" onchange="filterByDate()">
                                        
                                     </div>
                                 </div>
@@ -235,6 +236,10 @@ $transactions = $farma->getSalesTransactions($startDate, $endDate);
                 }
             });
         }
+        document.addEventListener('DOMContentLoaded', function () {
+    flatpickr("#start-date", { dateFormat: "Y-m-d", allowInput: true });
+    flatpickr("#end-date", { dateFormat: "Y-m-d", allowInput: true });
+});
     </script>
 
 </body>
