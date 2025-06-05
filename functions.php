@@ -76,6 +76,73 @@ class Farmamedika
         exit();
     }
     
+    public function getSalesSummaryByUser($startDate, $endDate, $specific_user_id = null) {
+        if (!$this->pdo) {
+            error_log("getSalesSummaryByUser Error: No valid PDO connection.");
+            return ['users_summary' => [], 'payment_method_headers' => []];
+        }
+
+        try {
+            // 1. Get active payment methods
+            $activePaymentMethods = $this->getActivePaymentMethods(); // Returns array of ['payment_method_id' => x, 'method_name' => 'Y']
+            
+            $paymentMethodHeaders = [];
+            $paymentMethodSumsSqlParts = [];
+
+            foreach ($activePaymentMethods as $pm) {
+                $methodIdentifier = preg_replace('/[^a-zA-Z0-9_]/', '_', $pm['method_name']); // Sanitize for alias
+                $paymentMethodHeaders[] = [
+                    'name' => $pm['method_name'], // Original name for display
+                    'alias_key' => 'total_sales_' . $methodIdentifier // Key to access data in result
+                ];
+                // Use payment_method_id for accuracy in SUM CASE
+                $paymentMethodSumsSqlParts[] = "SUM(CASE WHEN s.payment_method_id = " . intval($pm['payment_method_id']) . " THEN s.total_amount ELSE 0 END) AS total_sales_{$methodIdentifier}";
+            }
+            $paymentMethodSumsSql = !empty($paymentMethodSumsSqlParts) ? (", " . implode(", ", $paymentMethodSumsSqlParts)) : "";
+
+            $query = "SELECT
+                        s.user_id,
+                        usr.name AS cashier_name,
+                        COUNT(DISTINCT s.sale_id) AS total_transactions,
+                        SUM(s.total_amount) AS grand_total_sales_value,
+                        SUM(items_summary.total_quantity_sold) AS total_products_sold
+                        {$paymentMethodSumsSql}
+                      FROM sales s
+                      JOIN users usr ON s.user_id = usr.user_id
+                      LEFT JOIN (
+                          SELECT 
+                              si.sale_id, 
+                              SUM(si.quantity) AS total_quantity_sold
+                          FROM sale_items si
+                          GROUP BY si.sale_id
+                      ) items_summary ON s.sale_id = items_summary.sale_id
+                      WHERE DATE(s.sale_date) BETWEEN :startDate AND :endDate";
+            
+            $params = [
+                ':startDate' => $startDate,
+                ':endDate' => $endDate
+            ];
+
+            if ($specific_user_id !== null) {
+                $query .= " AND s.user_id = :specific_user_id";
+                $params[':specific_user_id'] = $specific_user_id;
+            }
+            
+            $query .= " GROUP BY s.user_id, usr.name
+                        ORDER BY usr.name ASC";
+            
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute($params);
+            $usersSummary = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return ['users_summary' => $usersSummary, 'payment_method_headers' => $paymentMethodHeaders];
+
+        } catch (PDOException $e) {
+            error_log("Database Error (getSalesSummaryByUser): " . $e->getMessage());
+            return ['users_summary' => [], 'payment_method_headers' => []];
+        }
+    }
+    
     public function getOutstandingInvoicesBySupplier(string $supplier_name): array {
         $sql = "SELECT 
                     purchase_id, 
@@ -103,6 +170,16 @@ class Farmamedika
             // error_log("Error fetching outstanding invoices for {$supplier_name}: " . $e->getMessage());
             // Untuk contoh ini, kita kembalikan array kosong jika ada error
             return [];
+        }
+    }
+    
+    function authorizeRoles($allowedRoles = []) 
+    {
+        if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], $allowedRoles)) {
+            // Optional: set pesan error ke session agar bisa ditampilkan di halaman signin
+            $_SESSION['error'] = 'Anda tidak memiliki izin mengakses halaman ini.';
+            header("Location: ../signin.php?access_denied=1");
+            exit();
         }
     }
     
@@ -189,17 +266,7 @@ class Farmamedika
         }
     }
     
-        /**
-     * Melakukan stok opname untuk satu produk tertentu
-     * 
-     * @param int $product_id ID produk yang akan di-opname
-     * @param float $actual_stock Jumlah stok aktual setelah penghitungan fisik
-     * @param int $user_id ID pengguna yang melakukan stok opname
-     * @param string $reason Alasan dilakukannya penyesuaian stok (opsional)
-     * @param string $related_transaction_id ID transaksi terkait (opsional)
-     * @return array Hasil operasi (success, message, dll)
-     */
-    public function performStockOpname($product_id, $actual_stock, $user_id, $reason = "Stok Opname Rutin", $related_transaction_id = null)
+    public function performStockOpname($product_id, $actual_stock, $user_id, $new_unit_input = null, $reason = "Stok Opname Rutin", $related_transaction_id = null)
     {
         if (!$this->pdo) {
             error_log("performStockOpname Error: No valid PDO connection.");
@@ -207,11 +274,9 @@ class Farmamedika
         }
     
         try {
-            // Begin transaction
             $this->pdo->beginTransaction();
     
-            // Get current stock from products table
-            $stmt = $this->pdo->prepare("SELECT product_id, product_name, stock_quantity FROM products WHERE product_id = :product_id FOR UPDATE");
+            $stmt = $this->pdo->prepare("SELECT product_id, product_name, stock_quantity, unit FROM products WHERE product_id = :product_id FOR UPDATE");
             $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
             $stmt->execute();
             $product = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -222,84 +287,104 @@ class Farmamedika
             }
     
             $current_stock = (float)$product['stock_quantity'];
-            $difference = (float)$actual_stock - $current_stock;
+            $product_current_unit = $product['unit'];
+            
+            // Handle jika actual_stock null (artinya hanya unit yang mungkin diubah)
+            $final_actual_stock = ($actual_stock === null) ? $current_stock : (float)$actual_stock;
+            $difference = $final_actual_stock - $current_stock;
+
+            $unit_will_change = ($new_unit_input !== null && trim($new_unit_input) !== '' && trim($new_unit_input) !== $product_current_unit);
+            $new_unit_to_save = $unit_will_change ? trim($new_unit_input) : $product_current_unit;
     
-            // Jika tidak ada perbedaan, tidak perlu penyesuaian
-            if ($difference == 0) {
-                $this->pdo->rollBack();
+            if ($difference == 0 && !$unit_will_change) {
+                $this->pdo->rollBack(); // Tidak ada perubahan, rollback transaksi item ini
                 return [
                     'success' => true, 
-                    'message' => 'Stok fisik sesuai dengan stok sistem, tidak ada penyesuaian yang diperlukan.',
+                    'message' => 'Stok fisik sesuai, unit tidak berubah.',
                     'product_name' => $product['product_name'],
                     'system_stock' => $current_stock,
-                    'actual_stock' => $actual_stock,
-                    'difference' => $difference
+                    'actual_stock' => $final_actual_stock,
+                    'difference' => $difference,
+                    'unit_changed' => false,
+                    'old_unit' => $product_current_unit,
+                    'new_unit' => $product_current_unit
                 ];
             }
-    
-            // Tentukan jenis pergerakan berdasarkan perbedaan
-            $movement_type = $difference > 0 ? 'penyesuaian_stok' : 'penyesuaian_stok';
-            $abs_difference = abs($difference);
             
-            // Catat pergerakan stok
-            $stmt = $this->pdo->prepare("INSERT INTO stock_movements 
-                                        (product_id, current_stock_before_movement, movement_type, 
-                                         quantity_changed, current_stock_after_movement, user_id, 
-                                         reason, related_transaction_id)
-                                        VALUES 
-                                        (:product_id, :current_stock_before, :movement_type, 
-                                         :quantity_changed, :current_stock_after, :user_id, 
-                                         :reason, :related_transaction_id)");
-            
-            $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
-            $stmt->bindParam(':current_stock_before', $current_stock);
-            $stmt->bindParam(':movement_type', $movement_type);
-            $stmt->bindParam(':quantity_changed', $difference);
-            $stmt->bindParam(':current_stock_after', $actual_stock);
-            $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
-            $stmt->bindParam(':reason', $reason);
-            $stmt->bindParam(':related_transaction_id', $related_transaction_id);
-            $stmt->execute();
+            $logMessageParts = [];
+            $returnMessageParts = [];
+
+            // Catat pergerakan stok jika ada perbedaan
+            if ($difference != 0) {
+                $movement_type = 'penyesuaian_stok'; // Tipe pergerakan tetap sama
+                $stmt_move = $this->pdo->prepare("INSERT INTO stock_movements 
+                                             (product_id, current_stock_before_movement, movement_type, 
+                                              quantity_changed, current_stock_after_movement, user_id, 
+                                              reason, related_transaction_id)
+                                             VALUES 
+                                             (:product_id, :current_stock_before, :movement_type, 
+                                              :quantity_changed, :current_stock_after, :user_id, 
+                                              :reason, :related_transaction_id)");
+                $stmt_move->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                $stmt_move->bindParam(':current_stock_before', $current_stock);
+                $stmt_move->bindParam(':movement_type', $movement_type);
+                $stmt_move->bindParam(':quantity_changed', $difference);
+                $stmt_move->bindParam(':current_stock_after', $final_actual_stock);
+                $stmt_move->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                $stmt_move->bindParam(':reason', $reason);
+                $stmt_move->bindParam(':related_transaction_id', $related_transaction_id);
+                $stmt_move->execute();
     
-            // Update stok produk
-            $stmt = $this->pdo->prepare("UPDATE products SET stock_quantity = :new_stock WHERE product_id = :product_id");
-            $stmt->bindParam(':new_stock', $actual_stock);
-            $stmt->bindParam(':product_id', $product_id, PDO::PARAM_INT);
-            $stmt->execute();
+                // Update stok produk
+                $stmt_update_stock = $this->pdo->prepare("UPDATE products SET stock_quantity = :new_stock WHERE product_id = :product_id");
+                $stmt_update_stock->bindParam(':new_stock', $final_actual_stock);
+                $stmt_update_stock->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                $stmt_update_stock->execute();
+
+                $adjTypeStok = $difference > 0 ? "penambahan" : "pengurangan";
+                $logMessageParts[] = "Stok: {$adjTypeStok} " . abs($difference) . " (sistem: {$current_stock}, aktual: {$final_actual_stock}).";
+                $returnMessageParts[] = "{$adjTypeStok} stok sebanyak " . abs($difference) . ".";
+            }
+
+            // Update unit produk jika berubah
+            if ($unit_will_change) {
+                $stmtUpdateUnit = $this->pdo->prepare("UPDATE products SET unit = :new_unit WHERE product_id = :product_id");
+                $stmtUpdateUnit->bindParam(':new_unit', $new_unit_to_save, PDO::PARAM_STR);
+                $stmtUpdateUnit->bindParam(':product_id', $product_id, PDO::PARAM_INT);
+                $stmtUpdateUnit->execute();
+                $logMessageParts[] = "Unit: diubah dari '{$product_current_unit}' ke '{$new_unit_to_save}'.";
+                $returnMessageParts[] = "Unit diubah ke '{$new_unit_to_save}'.";
+            }
     
-            // Log aktivitas
-            $adjustmentType = $difference > 0 ? "penambahan" : "pengurangan";
-            $logMessage = "Stok opname: {$adjustmentType} {$abs_difference} untuk produk {$product['product_name']} (ID: {$product_id}). Stok sistem: {$current_stock}, stok aktual: {$actual_stock}";
-            $this->logActivity($user_id, 'STOCK_OPNAME', $logMessage);
+            // Log aktivitas gabungan
+            $logDetail = empty($logMessageParts) ? "Tidak ada perubahan data." : implode(" ", $logMessageParts);
+            $this->logActivity($user_id, 'STOCK_OPNAME', "Produk {$product['product_name']} (ID: {$product_id}): {$logDetail} Alasan: {$reason}");
     
             $this->pdo->commit();
     
+            $finalReturnMessage = empty($returnMessageParts) ? "Tidak ada perubahan terdeteksi." : "Stok opname berhasil. " . implode(" ", $returnMessageParts);
+
             return [
                 'success' => true,
-                'message' => "Stok opname berhasil. {$adjustmentType} stok sebanyak {$abs_difference}.",
+                'message' => $finalReturnMessage,
                 'product_name' => $product['product_name'],
                 'system_stock' => $current_stock,
-                'actual_stock' => $actual_stock,
-                'difference' => $difference
+                'actual_stock' => $final_actual_stock,
+                'difference' => $difference,
+                'unit_changed' => $unit_will_change,
+                'old_unit' => $product_current_unit,
+                'new_unit' => $new_unit_to_save
             ];
     
         } catch (PDOException $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            error_log("PDO Error (performStockOpname): " . $e->getMessage());
+            error_log("PDO Error (performStockOpname for product_id {$product_id}): " . $e->getMessage());
             return ['success' => false, 'message' => 'Gagal melakukan stok opname: ' . $e->getMessage()];
         }
     }
     
-    /**
-     * Melakukan stok opname secara batch untuk multiple produk
-     * 
-     * @param array $stockOpnameData Array berisi data stok opname: [['product_id' => X, 'actual_stock' => Y], ...]
-     * @param int $user_id ID pengguna yang melakukan stok opname
-     * @param string $reason Alasan dilakukannya penyesuaian stok (opsional)
-     * @return array Hasil operasi (success, results)
-     */
     public function performBatchStockOpname($stockOpnameData, $user_id, $reason = "Stok Opname Rutin")
     {
         if (!$this->pdo) {
@@ -308,7 +393,7 @@ class Farmamedika
         }
         
         $results = [
-            'success' => true,
+            'success' => true, // Status keseluruhan batch
             'total_items' => count($stockOpnameData),
             'adjusted_items' => 0,
             'accurate_items' => 0,
@@ -316,72 +401,83 @@ class Farmamedika
             'details' => []
         ];
     
-        try {
-            // Begin transaction for all operations
-            $this->pdo->beginTransaction();
+        // Transaksi utama untuk seluruh batch
+        // Fungsi performStockOpname sudah mengelola transaksinya sendiri per item.
+        // Jika performStockOpname diubah agar tidak mengelola transaksi, maka beginTransaction di sini jadi penting.
+        // Untuk saat ini, dengan performStockOpname yang transaksional, begin/commit di sini kurang efektif.
+        // Namun, kita biarkan untuk potensi refaktor performStockOpname di masa depan.
+        // $this->pdo->beginTransaction(); 
+        
+        $related_transaction_id = "BATCH_OPNAME_" . date('YmdHis');
             
-            $opnameDate = date('Y-m-d H:i:s');
-            $related_transaction_id = "BATCH_OPNAME_" . date('YmdHis');
-            
-            foreach ($stockOpnameData as $item) {
-                if (!isset($item['product_id']) || !isset($item['actual_stock'])) {
-                    $results['failed_items']++;
-                    $results['details'][] = [
-                        'product_id' => $item['product_id'] ?? 'unknown',
-                        'success' => false,
-                        'message' => 'Data produk tidak lengkap.'
-                    ];
-                    continue;
-                }
-                
-                $itemResult = $this->performStockOpname(
-                    $item['product_id'],
-                    $item['actual_stock'],
-                    $user_id,
-                    $reason,
-                    $related_transaction_id
-                );
-                
-                if ($itemResult['success']) {
-                    if (isset($itemResult['difference']) && $itemResult['difference'] != 0) {
-                        $results['adjusted_items']++;
-                    } else {
-                        $results['accurate_items']++;
-                    }
-                } else {
-                    $results['failed_items']++;
-                }
-                
+        foreach ($stockOpnameData as $item) {
+            if (!isset($item['product_id']) || ($item['actual_stock'] === null && (!isset($item['new_unit']) || trim($item['new_unit']) === ''))) {
+                $results['failed_items']++;
                 $results['details'][] = [
-                    'product_id' => $item['product_id'],
-                    'product_name' => $itemResult['product_name'] ?? null,
-                    'system_stock' => $itemResult['system_stock'] ?? null,
-                    'actual_stock' => $itemResult['actual_stock'] ?? null,
-                    'difference' => $itemResult['difference'] ?? null,
-                    'success' => $itemResult['success'],
-                    'message' => $itemResult['message']
+                    'product_id' => $item['product_id'] ?? 'unknown',
+                    'success' => false,
+                    'message' => 'Data produk tidak lengkap (ID, stok, atau unit baru harus ada).',
+                    'product_name' => 'N/A',
+                    'system_stock' => null, 'actual_stock' => null, 'difference' => null,
+                    'unit_changed' => false, 'old_unit' => null, 'new_unit' => null
                 ];
+                continue;
             }
             
-            $this->pdo->commit();
+            $actual_stock_for_item = $item['actual_stock']; // Bisa null
+            $new_unit_for_item = $item['new_unit'] ?? null;
+
+            $itemResult = $this->performStockOpname(
+                $item['product_id'],
+                $actual_stock_for_item,
+                $user_id,
+                $new_unit_for_item,
+                $reason, 
+                $related_transaction_id // Gunakan ID batch untuk setiap item
+            );
             
-            // Log aktivitas batch
-            $logMessage = "Stok opname batch: {$results['adjusted_items']} item disesuaikan, {$results['accurate_items']} item akurat, {$results['failed_items']} item gagal.";
-            $this->logActivity($user_id, 'BATCH_STOCK_OPNAME', $logMessage);
-            
-            $results['message'] = "Stok opname batch selesai. {$results['adjusted_items']} item disesuaikan, {$results['accurate_items']} item akurat, {$results['failed_items']} item gagal.";
-            return $results;
-            
-        } catch (PDOException $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
+            if ($itemResult['success']) {
+                // Item dianggap 'adjusted' jika ada perbedaan stok ATAU perubahan unit
+                if ($itemResult['difference'] != 0 || (isset($itemResult['unit_changed']) && $itemResult['unit_changed'])) {
+                    $results['adjusted_items']++;
+                } else {
+                    $results['accurate_items']++;
+                }
+            } else {
+                $results['failed_items']++;
+                $results['success'] = false; // Jika satu item gagal, status batch keseluruhan gagal
             }
-            error_log("PDO Error (performBatchStockOpname): " . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Gagal melakukan stok opname batch: ' . $e->getMessage()
+            
+            $results['details'][] = [
+                'product_id' => $item['product_id'],
+                'product_name' => $itemResult['product_name'] ?? null,
+                'system_stock' => $itemResult['system_stock'] ?? null,
+                'actual_stock' => $itemResult['actual_stock'] ?? null,
+                'difference' => $itemResult['difference'] ?? null,
+                'unit_changed' => $itemResult['unit_changed'] ?? false,
+                'old_unit' => $itemResult['old_unit'] ?? null,
+                'new_unit' => $itemResult['new_unit'] ?? null,
+                'success' => $itemResult['success'],
+                'message' => $itemResult['message']
             ];
         }
+        
+        // if ($results['success']) {
+        //     $this->pdo->commit(); // Komit transaksi batch jika semua berhasil
+        // } else {
+        //     $this->pdo->rollBack(); // Rollback jika ada kegagalan dalam batch
+        // }
+        // Komentar di atas berlaku jika performStockOpname tidak transaksional.
+        // Karena performStockOpname sudah commit/rollback per item, baris ini tidak diperlukan.
+
+        $logMessage = "Stok opname batch: {$results['adjusted_items']} item disesuaikan (stok/unit), {$results['accurate_items']} item akurat, {$results['failed_items']} item gagal.";
+        $this->logActivity($user_id, 'BATCH_STOCK_OPNAME', $logMessage . " Alasan: " . $reason);
+        
+        $results['message'] = "Stok opname batch selesai. {$results['adjusted_items']} item disesuaikan (stok/unit), {$results['accurate_items']} item akurat, {$results['failed_items']} item gagal.";
+        if ($results['failed_items'] > 0) {
+             $results['message'] .= " Beberapa item mungkin gagal diproses.";
+        }
+        return $results;
     }
 
     /**
@@ -1089,6 +1185,25 @@ public function getProductsForPurchaseForm()
         }
     }
     
+    public function getAllUnits()
+    {
+        if (!$this->pdo) {
+            error_log("getAllUnits Error: No valid PDO connection.");
+            return [];
+        }
+        try {
+            // Asumsi tabel bernama 'units' dan kolom bernama 'unit_name'
+            // Sesuaikan query jika nama tabel/kolom Anda berbeda.
+            $query = "SELECT DISTINCT unit_name FROM units WHERE unit_name IS NOT NULL AND unit_name != '' ORDER BY unit_name ASC";
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Database Error (getAllUnits): " . $e->getMessage());
+            return [];
+        }
+    }
+    
     public function getAllUsers()
     {
         try {
@@ -1102,6 +1217,29 @@ public function getProductsForPurchaseForm()
             return [];
         }
     }
+    
+    public function getProductsByNameLike($productNameKeyword)
+    {
+        if (!$this->pdo) {
+            error_log("getProductsByNameLike Error: No valid PDO connection.");
+            return [];
+        }
+        try {
+            $query = "SELECT product_id, kode_item, product_name, posisi, unit, stock_quantity 
+                      FROM products 
+                      WHERE product_name LIKE :product_name_keyword AND is_active = 1
+                      ORDER BY product_name ASC";
+            $stmt = $this->pdo->prepare($query);
+            $keyword = "%" . trim($productNameKeyword) . "%";
+            $stmt->bindParam(':product_name_keyword', $keyword, PDO::PARAM_STR);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Database Error (getProductsByNameLike for '{$productNameKeyword}'): " . $e->getMessage());
+            return [];
+        }
+    }
+    
     public function deleteSale($saleId) 
     {
         try {
