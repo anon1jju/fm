@@ -12,9 +12,10 @@ let keyCount = 0;
 let isBarcodeScanning = false;
 let barcodeTimeout;
 
+
 const PCS_PER_STRIP = 10; // Definisikan konstanta konversi
 
-// Helper function to round up to the nearest thousand
+// Helper function to round up to the nearest thousandt
 const roundUpToNearestThousand = (num) => Math.ceil(num / 1000) * 1000;
 
 // Format number to currency
@@ -46,6 +47,8 @@ function updateCartSummary() {
     } else {
         $('#prescription-info').addClass('hidden');
     }
+    
+    
 }
 
 // Variabel global untuk melacak indeks item yang aktif di dropdown
@@ -55,12 +58,24 @@ function renderManualSearchResults(products) {
     const resultsContainer = $('#search-results-container');
     resultsContainer.empty();
     activeDropdownItemIndex = -1; // Reset item aktif setiap kali hasil baru dirender
+    
+    const currentSearchTerm = $('#product-search').val().trim(); // Cek nilai input saat ini
 
-    if (products.length === 0) {
-        resultsContainer.html('<div class="search-result-item p-3 text-gray-500">Produk tidak ditemukan.</div>');
-        resultsContainer.removeClass('hidden');
-        return;
-    }
+        // Hanya proses lebih lanjut jika memang ada search term saat ini
+        // Ini mencegah dropdown muncul kembali jika search term sudah dikosongkan
+        // oleh event lain (seperti clear button) sebelum AJAX search selesai.
+        if (currentSearchTerm.length === 0) {
+            resultsContainer.addClass('hidden'); // Pastikan hidden jika input sudah kosong
+            console.log("renderManualSearchResults: Input is empty, ensuring dropdown is hidden."); //DEBUG
+            return;
+        }
+
+        if (products.length === 0) {
+            resultsContainer.html('<div class="search-result-item p-3 text-gray-500">Produk tidak ditemukan.</div>');
+            resultsContainer.removeClass('hidden'); // Tampilkan pesan "tidak ditemukan"
+            console.log("renderManualSearchResults: No products found, showing 'not found' message."); //DEBUG
+            return;
+        }
 
     products.forEach((product, index) => { // Tambahkan 'index' di sini
         const productName = product.product_name || 'N/A';
@@ -137,7 +152,7 @@ function renderCartItems() {
         html += `
             <div class="border-b bg-white p-3 rounded-md shadow-sm mb-2">
                 <div class="flex justify-between mb-1">
-                    <span class="font-semibold">${item.name}</span>
+                    <span class="text-md font-semibold">${item.name}</span>
                     <span class="text-blue-600">Rp ${item.price.toLocaleString('id-ID')} / ${item.unit}</span>
                 </div>
                 <div class="flex justify-between items-start">
@@ -450,22 +465,23 @@ function saveTransaction() {
     return true;
 }
 
+
 function togglePaymentMethod(methodId, methodName) {
-    selectedPaymentMethod = methodId;
+    console.log("togglePaymentMethod - ID:", methodId, "Nama:", methodName); // DEBUG
+    selectedPaymentMethod = methodId; // Ini yang penting
+    
     $('#cash-amount').val('');
-    $('#change-amount').text('Rp 0');
-    if (methodName.toLowerCase().includes('tunai')) {
+    $('#change-amount').text(formatCurrency(0));
+
+    if (methodName && methodName.toLowerCase().includes('tunai')) {
         $('#cash-payment-fields').removeClass('hidden');
+        $('#cash-amount').focus();
     } else {
         $('#cash-payment-fields').addClass('hidden');
     }
     
-    // Aktifkan tombol pembayaran jika ada item di keranjang dan metode pembayaran dipilih
-    if (cartItems.length > 0 && selectedPaymentMethod !== null) {
-        $('#process-payment-btn').prop('disabled', false);
-    } else {
-        $('#process-payment-btn').prop('disabled', true);
-    }
+    updateCartSummary();
+    updatePaymentButtonState();
 }
 
 function updatePaymentButtonState() {
@@ -488,8 +504,8 @@ function updatePaymentButtonState() {
 }
 
 
-function calculateChange() {
-    const grandTotalText = $('#grand-total').text().trim() || $('#sticky-grand-total-display').text().trim(); 
+/*function calculateChange() {
+    const grandTotalText = $('#grand-total').text().trim() || $('#modal-total-tagihan').text().trim(); 
     const totalAmount = parseInt(grandTotalText.replace(/Rp\s?/, '').replace(/\./g, '')) || 0;
     
     if (!$('#cash-amount').val().trim()) {
@@ -504,7 +520,7 @@ function calculateChange() {
     $('#change-amount').text(formatCurrency(changeAmount));
     updatePaymentButtonState(); 
     return { totalAmount, cashAmount, changeAmount };
-}
+}*/
 
 function formatCashInput(input) {
     const cursorPos = input.selectionStart;
@@ -584,6 +600,50 @@ $(document).ready(function() {
         renderCartItems(); 
         updateCartSummary();
     });
+    
+    $('#clear-cash-paid').on('click', function() {
+        // Clear the cash amount input
+        $('#cash-amount').val('');
+        
+        // Reset the change amount to Rp 0
+        $('#change-amount').text('Rp 0');
+        
+        // Optional: Set focus back to the input field
+        $('#cash-amount').focus();
+    });
+    
+    $('#clear-discount').on('click', function() {
+        $('#discount-amount').val('0');
+    });
+    
+    // Handle empty discount field
+    $('#discount-amount').on('blur', function() {
+        if ($(this).val() === '' || $(this).val() === null) {
+            $(this).val('0');
+        }
+    });
+    
+    $('input[name="payment_method"].payment-method-radio').change(function() {
+        if (this.checked) {
+            const methodId = $(this).data('id');
+            const methodName = $(this).data('name') || $(this).val(); // Ambil dari data-name atau value radio
+            
+            // Hapus class aktif dari semua label (opsional, untuk styling)
+            $('input[name="payment_method"].payment-method-radio').each(function() {
+                $('label[for="' + $(this).attr('id') + '"]').removeClass('text-indigo-600 font-bold'); // Contoh styling
+            });
+            // Tambah class aktif ke label yang dipilih (opsional)
+            $('label[for="' + $(this).attr('id') + '"]').addClass('text-indigo-600 font-bold'); // Contoh styling
+    
+            togglePaymentMethod(methodId, methodName);
+        }
+    });
+    
+    // Panggil togglePaymentMethod untuk radio button yang sudah dicek saat halaman dimuat
+    const initialCheckedRadio = $('input[name="payment_method"].payment-method-radio:checked');
+    if (initialCheckedRadio.length > 0) {
+        togglePaymentMethod(initialCheckedRadio.data('id'), initialCheckedRadio.data('name') || initialCheckedRadio.val());
+    }
 
     // Event handler untuk tombol +/- kuantitas
     $('#cart-items').on('click', '.cart-qty-btn', function() {
@@ -704,19 +764,22 @@ $(document).ready(function() {
         
 
         if (keyword.length < 2) { 
-            resultsContainer.empty().addClass('hidden'); // Atau tampilkan pesan "ketik lagi"
+            resultsContainer.empty().addClass('hidden');
             $('#clear-search').show();
+            activeDropdownItemIndex = -1; // Reset juga di sini
             return;
         }
         
         $('#clear-search').show();
-        searchProducts(keyword, false); // isBarcode = false untuk pencarian manual
+        searchProducts(keyword, false);
     });
     
     $('#clear-search').click(function() {
-        $('#product-search').val('').focus(); 
-        $(this).hide(); 
-        $('.category-btn[data-id="0"]').click(); 
+        $('#product-search').val('').focus();
+        $(this).hide();
+        const resultsContainer = $('#search-results-container');
+        resultsContainer.empty().addClass('hidden');
+        activeDropdownItemIndex = -1;
     });
     
     $('.payment-method-btn').click(function() {
