@@ -236,7 +236,7 @@ if ($pdo) {
                                                                 <div class="error-message kode-item-error-message" style="display: none;"></div>
                                                             </div>
                                                         </td>
-                                                        <td><input type="text" name="barcode[]" class="ti-form-input w-full" /><div id="barcode_error" class="error-message"></div></td>
+                                                        <td><input type="text" name="barcode[]" class="ti-form-input" style="width: 100px; font-size: 12px;"/><div id="barcode_error" class="error-message"></div></td>
                                                         
                                                         <td><input type="text" name="nama_produk[]" class="ti-form-input" style="width: 150px; font-size: 12px;" required /></td>
                                                         <td>
