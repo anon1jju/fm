@@ -97,6 +97,7 @@ if ($pdo) {
     <?php include "includes/meta.php"; ?>
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
         .select2-container--default .select2-selection--single {
             height: calc(1.5em + 0.938rem + 0.125rem) !important;
@@ -366,6 +367,7 @@ if ($pdo) {
     <script src="../assets/js/custom.js"></script>
     <script src="../assets/js/auto_format_date_input_baru.js"></script>
     <script src="../assets/js/custom-switcher.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../assets/js/setting_input.js"> </script>
     <script>
     document.addEventListener('DOMContentLoaded', function () {
