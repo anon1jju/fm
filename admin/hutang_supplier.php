@@ -81,7 +81,7 @@ if (!empty($filter_start_date) && !empty($filter_end_date)) {
 // else if (!empty($filter_end_date)) { ... }
 
 
-// --- PERHITUNGAN TOTAL HUTANG KESELURUHAN YANG SUDAH DIKOREKSI ---
+// --- PERHITUNGAN TOTAL HUTANG KESELURUHAN YANG SUDAH DIKOREKSI ---\n
 $total_hutang_overall = 0;      
 foreach ($filtered_purchases as $purchase_item) { // Gunakan variabel berbeda untuk item loop
     // Hanya hitung jika statusnya hutang atau cicil
@@ -217,7 +217,7 @@ foreach ($filtered_purchases as $purchase_item) { // Gunakan variabel berbeda un
                             </div>
                             <div class="box-body">
                                 <div class="max-h-[70vh] overflow-y-auto table-responsive">
-                                    <table id="purchasesTable" class="scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 table border border-defaultborder dark:border-defaultborder/10 text-nowrap min-w-full">
+                                    <table id="purchasesTable" class="scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 table border border-defaultborder dark:border-defaultborder/10 w-full">
                                         <thead class="bg-sky-400 sticky top-0 z-10">
                                             <tr class="border-b border-defaultborder dark:border-defaultborder/10">
                                                 <th class="px-4 py-2 text-left">No. Invoice</th>
@@ -267,10 +267,10 @@ foreach ($filtered_purchases as $purchase_item) { // Gunakan variabel berbeda un
                                                         <td class="px-4 py-2"><?php echo htmlspecialchars($purchase_row['supplier_name'] ?? '-'); ?></td>
                                                         <td class="px-4 py-2"><?php echo isset($purchase_row['purchase_date']) ? htmlspecialchars(date('d M Y', strtotime($purchase_row['purchase_date']))) : '-'; ?></td>
                                                         <td class="px-4 py-2"><?php echo (isset($purchase_row['due_date']) && !empty($purchase_row['due_date'])) ? htmlspecialchars(date('d M Y', strtotime($purchase_row['due_date']))) : '-'; ?></td>
-                                                        <td class="px-4 py-2 text-right">Rp <?php echo htmlspecialchars(number_format($item_total, 2, ',', '.')); ?></td>
-                                                        <td class="px-4 py-2 text-right">Rp <?php echo htmlspecialchars(number_format($item_paid, 2, ',', '.')); ?></td>
+                                                        <td class="px-4 py-2 text-right"><?php echo htmlspecialchars(number_format($item_total, 2, ',', '.')); ?></td>
+                                                        <td class="px-4 py-2 text-right"><?php echo htmlspecialchars(number_format($item_paid, 2, ',', '.')); ?></td>
                                                         <td class="px-4 py-2 text-right font-semibold <?php echo $item_sisa_hutang > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'; ?>">
-                                                            Rp <?php echo htmlspecialchars(number_format($item_sisa_hutang, 2, ',', '.')); ?>
+                                                            <?php echo htmlspecialchars(number_format($item_sisa_hutang, 2, ',', '.')); ?>
                                                         </td>
                                                         <td class="px-4 py-2 text-center">
                                                             <?php 
@@ -303,10 +303,13 @@ foreach ($filtered_purchases as $purchase_item) { // Gunakan variabel berbeda un
                                                         </td>
                                                         <td class="px-4 py-2"><?php echo htmlspecialchars($purchase_row['user_name'] ?? '-'); ?></td>
                                                         <td class="px-4 py-2 text-center">
-                                                            <a href="view_purchase.php?purchase_id=<?php echo $purchase_row['purchase_id'] ?? ''; ?>" class="ti-btn ti-btn-xs ti-btn-info me-1" title="Lihat Detail">Detail</a>
-                                                            <?php if ($item_sisa_hutang > 0): // Tombol bayar hanya jika masih ada sisa hutang ?>
-                                                            <a href="edit_purchase.php?purchase_id=<?php echo $purchase_row['purchase_id'] ?? ''; ?>" class="ti-btn ti-btn-xs ti-btn-success" title="Kelola Pembayaran">Bayar</a>
-                                                            <?php endif; ?>
+                                                            <div class="flex items-center justify-center space-x-1">
+                                                                <a href="view_purchase.php?purchase_id=<?php echo $purchase_row['purchase_id'] ?? ''; ?>" class="ti-btn ti-btn-xs ti-btn-info me-1" title="Lihat Detail Pembelian"><i class="ri-eye-line"></i></a>
+                                                                <a href="edit_purchase_items.php?purchase_id=<?php echo $purchase_row['purchase_id'] ?? ''; ?>" class="ti-btn ti-btn-xs ti-btn-warning me-1" title="Edit Item Produk"><i class="ri-pencil-line"></i></a>
+                                                                <?php if ($item_sisa_hutang > 0): // Tombol bayar hanya jika masih ada sisa hutang ?>
+                                                                <a href="edit_purchase.php?purchase_id=<?php echo $purchase_row['purchase_id'] ?? ''; ?>" class="ti-btn ti-btn-xs ti-btn-success" title="Edit Status Bayar & Penerimaan"><i class="ri-money-dollar-circle-line"></i></a>
+                                                                <?php endif; ?>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 <?php endforeach; ?>
