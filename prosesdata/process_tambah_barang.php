@@ -225,6 +225,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $response['status'] = 'error';
             $response['message'] = "Terdapat kesalahan pada beberapa item:<br>" . implode("<br>", $errors);
+            $response['redirect_url'] = 'admin/beli.php';
             // $_SESSION['form_data'] tidak relevan untuk AJAX response
         } else {
             $pdo->commit();
