@@ -97,7 +97,7 @@ if (isset($_GET['show_user_summary']) && $_GET['show_user_summary'] == 'true') {
                                                             <th class="py-2 px-3 text-right">Total <?php echo htmlspecialchars($header['name']); ?>
                                                             </th>
                                                         <?php endforeach; ?>
-                                                        <th class="py-2 px-3 text-right font-bold">Grand Total Penjualan (Rp)</th>
+                                                        <th class="py-2 px-3 text-right font-bold">Total Penjualan (Rp)</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -168,9 +168,9 @@ if (isset($_GET['show_user_summary']) && $_GET['show_user_summary'] == 'true') {
                                                         <?php if ($sale['payment_status'] == 'paid') : ?>
                                                             <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full dark:bg-green-900 dark:text-green-300">Lunas</span>
                                                         <?php elseif ($sale['payment_status'] == 'pending') : ?>
-                                                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full dark:bg-yellow-900 dark:text-yellow-300">Pending</span>
+                                                            <span class="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full dark:bg-yellow-900 dark:text-red-300">Hutang</span>
                                                         <?php elseif ($sale['payment_status'] == 'partially_paid') : ?>
-                                                            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full dark:bg-blue-900 dark:text-blue-300">Sebagian</span>
+                                                            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full dark:bg-blue-900 dark:text-blue-300">Cicil</span>
                                                         <?php else : ?>
                                                             <span class="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-1 rounded-full dark:bg-gray-700 dark:text-gray-300"><?php echo htmlspecialchars($sale['payment_status']); ?></span>
                                                         <?php endif; ?>
