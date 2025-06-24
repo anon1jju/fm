@@ -186,6 +186,11 @@ if (isset($_GET['show_user_summary']) && $_GET['show_user_summary'] == 'true') {
                                                             <button onclick="deleteSale(<?php echo $sale['sale_id']; ?>, '<?php echo htmlspecialchars($sale['invoice_number']); ?>')" class="ti-btn ti-btn-icon ti-btn-sm ti-btn-danger">
                                                                 <i class="ri-delete-bin-line text-lg"></i>
                                                             </button>
+                                                            <?php if ($sale['payment_status'] == 'pending' || $sale['payment_status'] == 'partially_paid') : ?>
+    <a href="pelunasan.php?id=<?php echo $sale['sale_id']; ?>" class="ti-btn ti-btn-icon ti-btn-sm ti-btn-success" title="Lakukan Pelunasan">
+        <i class="ri-money-dollar-circle-line text-lg"></i>
+    </a>
+<?php endif; ?>
                                                         </div>
                                                     </td>
                                                 </tr>
